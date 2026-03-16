@@ -5,10 +5,7 @@ __pycache__/
 logs/
 artifacts/
 .env
-data/raw/
-data/processed/
 engine_health_monitoring_ai.egg-info/
 *.pkl
 *.log
-*.pyc
 .DS_Store

@@ -25,4 +25,5 @@ jobs:
 
     - name: Run Training Pipeline
       run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
         python src/pipeline/train_pipeline.py
