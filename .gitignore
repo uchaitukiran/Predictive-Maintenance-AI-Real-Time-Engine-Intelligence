@@ -8,3 +8,7 @@ artifacts/
 data/raw/
 data/processed/
 engine_health_monitoring_ai.egg-info/
+*.pkl
+*.log
+*.pyc
+.DS_Store
