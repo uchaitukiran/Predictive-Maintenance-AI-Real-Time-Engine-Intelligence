@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Engine Viewer</title>
+
+    <style>
+        body { margin:0; overflow:hidden; }
+
+        button{
+            position:absolute;
+            left:20px;
+            padding:10px 15px;
+            background:#f39c12;
+            border:none;
+            cursor:pointer;
+        }
+
+        #btnBody { top:20px; }
+        #btnDetails { top:60px; }
+
+        canvas { display:block; }
+    </style>
+</head>
+
+<body>
+
+<button id="btnBody">Toggle Engine Body</button>
+<button id="btnDetails">Toggle Engine Details</button>
+
+<canvas id="scene"></canvas>
+
+<!-- THREE CDN (NO MODULE ERROR) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
+
+<script src="js/viewer.js"></script>
+
+</body>
+</html>
