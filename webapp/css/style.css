@@ -1,23 +1,88 @@
 body{
-margin:0;
-background:#111;
-overflow:hidden;
+    margin:0;
+    overflow:hidden;
+    font-family: Arial;
+    background:#111;
 }
 
+/* Canvas */
 canvas{
-width:100vw;
-height:100vh;
-display:block;
+    width:100vw;
+    height:100vh;
+    display:block;
 }
 
-button{
-position:absolute;
-top:20px;
-left:20px;
-padding:10px 20px;
-background:orange;
-border:none;
-font-weight:bold;
-cursor:pointer;
-z-index:10;
+/* 🔥 CONTROL PANEL */
+.control-panel{
+    position:absolute;
+    top:20px;
+    left:20px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    z-index:100;
+    background:rgba(0,0,0,0.5);
+    padding:15px;
+    border-radius:10px;
 }
+
+/* Buttons */
+.control-panel button{
+    padding:10px;
+    border:none;
+    cursor:pointer;
+    font-weight:bold;
+    width:180px;
+    color:white;
+}
+
+/* Colors */
+.control-panel button:nth-child(1),
+.control-panel button:nth-child(2){
+    background:#f39c12;
+}
+
+.control-panel button:nth-child(3),
+.control-panel button:nth-child(4){
+    background:#3498db;
+}
+
+/* Status Box */
+.status-box{
+    position:absolute;
+    top:20px;
+    right:20px;
+    background:rgba(0,0,0,0.7);
+    color:white;
+    padding:15px;
+    border-radius:10px;
+    z-index:50;
+}
+
+/* Legend */
+.legend{
+    position:absolute;
+    bottom:20px;
+    right:20px;
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    z-index:50;
+}
+
+.legend-item{
+    margin:8px 0;
+    font-weight:bold;
+}
+
+.dot{
+    height:12px;
+    width:12px;
+    display:inline-block;
+    border-radius:50%;
+    margin-right:8px;
+}
+
+.green{ background:green; }
+.yellow{ background:gold; }
+.red{ background:red; }

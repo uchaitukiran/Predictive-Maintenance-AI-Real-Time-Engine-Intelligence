@@ -1,39 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Engine Viewer</title>
+    <title>Engine Health Monitor</title>
 
-    <style>
-        body { margin:0; overflow:hidden; }
+    <link rel="stylesheet" href="css/style.css">
 
-        button{
-            position:absolute;
-            left:20px;
-            padding:10px 15px;
-            background:#f39c12;
-            border:none;
-            cursor:pointer;
-        }
-
-        #btnBody { top:20px; }
-        #btnDetails { top:60px; }
-
-        canvas { display:block; }
-    </style>
+    <!-- THREE JS -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
 </head>
 
 <body>
 
-<button id="btnBody">Toggle Engine Body</button>
-<button id="btnDetails">Toggle Engine Details</button>
+<!-- 🔥 CONTROL PANEL -->
+<div class="control-panel">
+    <button id="btnBody">Toggle Engine Body</button>
+    <button id="btnDetails">Toggle Engine Details</button>
+    <button onclick="showRealEngine()">Real Engine</button>
+    <button onclick="startAutoTest()">Auto Test</button>
+</div>
 
+<!-- CANVAS -->
 <canvas id="scene"></canvas>
 
-<!-- THREE CDN (NO MODULE ERROR) -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
+<!-- STATUS -->
+<div class="status-box">
+    <h2>Engine Status</h2>
+    <p id="stateText">State: --</p>
+    <p id="rulText">RUL: --</p>
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+    <h3>Health Legend</h3>
+    <div class="legend-item"><span class="dot green"></span> GOOD</div>
+    <div class="legend-item"><span class="dot yellow"></span> WARNING</div>
+    <div class="legend-item"><span class="dot red"></span> CRITICAL</div>
+</div>
 
 <script src="js/viewer.js"></script>
 

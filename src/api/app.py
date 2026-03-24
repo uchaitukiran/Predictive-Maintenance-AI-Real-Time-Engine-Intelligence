@@ -1,8 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import joblib
 import pandas as pd
 
 app = FastAPI(title="Engine Health Monitoring API")
+
+# ✅ CORS FIX
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 MODEL_PATH = "artifacts/best_GradientBoosting.pkl"
 
@@ -12,17 +22,39 @@ model = joblib.load(MODEL_PATH)
 
 @app.get("/")
 def home():
-    return {"message": "Engine RUL Prediction API is running"}
+    return {"message": "API Running"}
 
 
 @app.post("/predict")
 def predict(data: dict):
 
-    df = pd.DataFrame([data])
+    try:
+        print("Incoming data:", data)
 
-    # Remove columns that model doesn't use
-    df = df.drop(columns=["engine_id", "cycle"], errors="ignore")
+        df = pd.DataFrame([data])
 
-    prediction = model.predict(df)[0]
+        # 👉 IMPORTANT: ensure columns match model
+        expected_cols = model.feature_names_in_
+        df = df.reindex(columns=expected_cols, fill_value=0)
 
-    return {"Predicted_RUL": float(prediction)}
+        rul = float(model.predict(df)[0])
+
+        # STATE LOGIC
+        if rul > 120:
+            state = "GOOD"
+        elif rul > 60:
+            state = "WARNING"
+        else:
+            state = "CRITICAL"
+
+        return {
+            "Predicted_RUL": rul,
+            "state": state
+        }
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return {
+            "error": str(e),
+            "state": "CRITICAL"
+        }
