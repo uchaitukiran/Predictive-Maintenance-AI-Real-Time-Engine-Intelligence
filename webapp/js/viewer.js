@@ -29,11 +29,20 @@ new THREE.RGBELoader().load("hdri/studio.hdr", function(texture){
     scene.environment = texture;
 });
 
-// LIGHT
+// LIGHTS
 const light = new THREE.DirectionalLight(0xffffff, 1.6);
 light.position.set(5, 12, 6);
 light.castShadow = true;
 scene.add(light);
+
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+fillLight.position.set(-5, 3, 5);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
+rimLight.position.set(0, 5, -8);
+scene.add(rimLight);
+
 scene.add(new THREE.AmbientLight(0xffffff, 0.18));
 
 // GROUND
@@ -52,8 +61,6 @@ let rotationSpeed = { fan:0.12, compressor:0.18, turbine:0.2 };
 let vibration = 0;
 
 // -------------------------
-// MODEL LOAD
-// -------------------------
 const loader = new THREE.GLTFLoader();
 
 loader.load("models/engine.glb", function(gltf){
@@ -67,49 +74,29 @@ loader.load("models/engine.glb", function(gltf){
 
     scene.add(model);
 
-    // Material tuning
     model.traverse(function(child){
         if(child.isMesh){
             child.castShadow = true;
             child.material.envMapIntensity = 2.8;
-            child.material.metalness = 0.7;
-            child.material.roughness = 0.15;
         }
     });
 
-    // ✅ IMPORTANT: pick ONLY front fan (first rotating part)
-    // 🔥 FIND ALL PARTS PROPERLY
-model.traverse((obj) => {
+    model.traverse((obj) => {
+        if(obj.name === "fan_rotor") fan = obj;
+        if(obj.name === "compressor_rotor") compressor = obj;
+        if(obj.name === "turbine_rotor") turbine = obj;
 
-    if(obj.name === "fan_rotor") fan = obj;
-    if(obj.name === "compressor_rotor") compressor = obj;
-    if(obj.name === "turbine_rotor") turbine = obj;
+        if(obj.name === "engine_body") body = obj;
+        if(obj.name === "engine_details") details = obj;
+    });
 
-    if(obj.name === "engine_body") body = obj;
-    if(obj.name === "engine_details") details = obj;
-
-});
-
-// DEBUG (check once)
-console.log("FAN:", fan);
-console.log("COMPRESSOR:", compressor);
-console.log("TURBINE:", turbine);
-
-// fallback (if fan not found)
-if(!fan){
-    fan = model.children[0];
-}
-
-// DEBUG
-console.log("FAN:", fan);
-console.log("BODY:", body);
-console.log("DETAILS:", details);
+    if(!fan){
+        fan = model.children[0];
+    }
 
     getPrediction();
 });
 
-// -------------------------
-// API CALL
 // -------------------------
 async function getPrediction(){
     try{
@@ -136,8 +123,6 @@ async function getPrediction(){
 }
 
 // -------------------------
-// RESET COLORS
-// -------------------------
 function resetColors(){
     if(!model) return;
 
@@ -145,74 +130,72 @@ function resetColors(){
         if(obj.isMesh){
             obj.material.emissive.set(0x000000);
             obj.material.emissiveIntensity = 0;
+            obj.userData.baseGlow = 0;
+            obj.userData.isBreathing = false;
         }
     });
 }
 
-// -------------------------
-// APPLY STATE
 // -------------------------
 function applyState(state){
 
     resetColors();
 
     if(state === "GOOD"){
-
-        // 🟢 FULL ENGINE GREEN (SOFT, NOT UGLY)
-        model.traverse(function(obj){
-            if(obj.isMesh){
-                obj.material.emissive.set(0x00ff00);
-                obj.material.emissiveIntensity = 0.35; // 🔥 balanced
-            }
-        });
-
         rotationSpeed = { fan:0.1, compressor:0.15, turbine:0.2 };
         vibration = 0;
+    }
 
-    }else if(state === "WARNING"){
+    // WARNING = compressor only, yellow
+    else if(state === "WARNING"){
 
-        model.traverse(function(obj){
-            if(obj.isMesh){
-                obj.material.emissive.set(0xffaa00);
-                obj.material.emissiveIntensity = 0.5;
-            }
-        });
+        if(compressor){
+            compressor.traverse(obj=>{
+                if(obj.isMesh){
+                    obj.material.emissive.set(0xffcc00);
+                    obj.material.emissiveIntensity = 0.9;
+                    obj.userData.baseGlow = 0.9;
+                    obj.userData.isBreathing = true;
+                }
+            });
+        }
 
         rotationSpeed = { fan:0.15, compressor:0.2, turbine:0.25 };
         vibration = 0.02;
+    }
 
-    }else{
+    // CRITICAL = turbine + compressor, both red family only
+    else{
 
-    model.traverse((obj)=>{
-        if(obj.isMesh){
-
-            // 🔴 base red
-            obj.material.emissive.set(0xff0000);
-            obj.material.emissiveIntensity = 0.8;
-
-            // 🔥 EXTRA HEAT ON TURBINE
-            if(obj.name.toLowerCase().includes("turbine")){
-                obj.material.emissive.set(0xff2200); // hot orange-red
-                obj.material.emissiveIntensity = 1.5; // 🔥 glow boost
-            }
-
+        if(turbine){
+            turbine.traverse(obj=>{
+                if(obj.isMesh){
+                    obj.material.emissive.set(0xff0000);
+                    obj.material.emissiveIntensity = 1.2;
+                    obj.userData.baseGlow = 1.2;
+                    obj.userData.isBreathing = true;
+                }
+            });
         }
-    });
 
-    rotationSpeed = {
-        fan: 0.3,
-        compressor: 0.35,
-        turbine: 0.45
-    };
+        if(compressor){
+            compressor.traverse(obj=>{
+                if(obj.isMesh){
+                    obj.material.emissive.set(0xcc0000);
+                    obj.material.emissiveIntensity = 0.8;
+                    obj.userData.baseGlow = 0.8;
+                    obj.userData.isBreathing = true;
+                }
+            });
+        }
 
-    vibration = 0.08; // stronger shake
-}
+        rotationSpeed = { fan:0.3, compressor:0.35, turbine:0.45 };
+        vibration = 0.08;
+    }
 
     document.getElementById("stateText").innerText = "State: " + state;
 }
 
-// -------------------------
-// AUTO TEST
 // -------------------------
 let autoInterval = null;
 
@@ -229,8 +212,6 @@ function startAutoTest(){
 }
 
 // -------------------------
-// REAL ENGINE RESET
-// -------------------------
 function showRealEngine(){
     if(autoInterval) clearInterval(autoInterval);
 
@@ -242,19 +223,26 @@ function showRealEngine(){
 }
 
 // -------------------------
-// ANIMATION
-// -------------------------
 function animate(){
 
     requestAnimationFrame(animate);
 
     if(fan) fan.rotation.x += rotationSpeed.fan;
-
     if(compressor) compressor.rotation.x += rotationSpeed.compressor;
-
     if(turbine) turbine.rotation.x += rotationSpeed.turbine;
 
-    // 🔥 SHAKE ENGINE ONLY
+    // visible breathing
+    const pulse = (Math.sin(Date.now() * 0.004) + 1) / 2;
+
+    if(model){
+        model.traverse((obj)=>{
+            if(obj.isMesh && obj.userData.isBreathing){
+                obj.material.emissiveIntensity =
+                    obj.userData.baseGlow * (0.55 + pulse * 0.85);
+            }
+        });
+    }
+
     if(model){
         if(vibration > 0){
             model.position.x = (Math.random() - 0.5) * vibration;
@@ -268,25 +256,15 @@ function animate(){
     renderer.render(scene, camera);
 }
 
-// 🔥 BUTTON FIX (ensure DOM loaded)
+// BUTTONS (UNCHANGED)
 window.addEventListener("load", () => {
 
     document.getElementById("btnBody").onclick = () => {
-        if(body){
-            body.visible = !body.visible;
-            console.log("Body toggled:", body.visible);
-        } else {
-            console.log("Body NOT FOUND");
-        }
+        if(body) body.visible = !body.visible;
     };
 
     document.getElementById("btnDetails").onclick = () => {
-        if(details){
-            details.visible = !details.visible;
-            console.log("Details toggled:", details.visible);
-        } else {
-            console.log("Details NOT FOUND");
-        }
+        if(details) details.visible = !details.visible;
     };
 
 });
