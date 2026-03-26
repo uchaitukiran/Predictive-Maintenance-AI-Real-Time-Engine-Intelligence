@@ -2,43 +2,59 @@
 <html>
 <head>
     <title>Engine Health Monitor</title>
-
+    <meta charset="UTF-8">
     <link rel="stylesheet" href="css/style.css">
-
+    
     <!-- THREE JS -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
+    
+    <!-- POST PROCESSING -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 </head>
-
 <body>
 
-<!-- 🔥 CONTROL PANEL -->
+<!-- CONTROL PANEL -->
 <div class="control-panel">
     <button id="btnBody">Toggle Engine Body</button>
     <button id="btnDetails">Toggle Engine Details</button>
     <button onclick="showRealEngine()">Real Engine</button>
     <button onclick="startAutoTest()">Auto Test</button>
+    <button id="btnSound" onclick="toggleSound()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">Sound: OFF</button>
+
+    <div class="slider-container">
+        <label>Environment Rotation</label>
+        <input type="range" id="rotationSlider" min="0" max="360" value="0">
+    </div>
 </div>
 
-<!-- CANVAS -->
 <canvas id="scene"></canvas>
 
-<!-- STATUS -->
 <div class="status-box">
     <h2>Engine Status</h2>
     <p id="stateText">State: --</p>
     <p id="rulText">RUL: --</p>
 </div>
 
-<!-- LEGEND -->
 <div class="legend">
     <h3>Health Legend</h3>
     <div class="legend-item"><span class="dot green"></span> GOOD</div>
     <div class="legend-item"><span class="dot yellow"></span> WARNING</div>
     <div class="legend-item"><span class="dot red"></span> CRITICAL</div>
 </div>
+
+<!-- AUDIO ELEMENTS -->
+<audio id="soundEngine" loop src="sounds/engine_hum.mp3" preload="auto"></audio>
+<audio id="soundWarning" loop src="sounds/warning.mp3" preload="auto"></audio>
+<audio id="soundAlarm" loop src="sounds/alarm.mp3" preload="auto"></audio>
 
 <script src="js/viewer.js"></script>
 
