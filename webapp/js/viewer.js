@@ -37,14 +37,11 @@ function setupPostProcessing() {
         const renderPass = new THREE.RenderPass(scene, camera);
         composer.addPass(renderPass);
 
-        // Bloom Settings:
-        // Strength 0.3 (Subtle Glow)
-        // Threshold 0.88 (High cutoff - stops Sky/Env from glowing)
         const bloomPass = new THREE.UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             0.2,  // Strength
-            0.15,  // Radius
-            0.8  // Threshold
+            0.1,  // Radius
+            0.8   // Threshold
         );
         composer.addPass(bloomPass);
 
@@ -122,12 +119,12 @@ scene.add(fillLight);
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
 // ---------------------------------------------------------
-// SMOKE SYSTEM
+// SMOKE SYSTEM (TURBULENCE & SPREAD)
 // ---------------------------------------------------------
 let smokeParticles = null;
 let turbinePosition = new THREE.Vector3(); 
 let exhaustDirection = new THREE.Vector3(0, 0, -1); 
-const smokeCount = 200;
+const smokeCount = 350; // Increased for density
 
 function createSmokeSystem() {
     const canvas = document.createElement('canvas');
@@ -148,22 +145,30 @@ function createSmokeSystem() {
         size: 3.5, 
         map: smokeTexture,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.6,
         depthWrite: false,
         blending: THREE.NormalBlending
     });
 
     const smokeGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(smokeCount * 3);
-    const velocities = [];
+    const velocities = []; // Stores { vx, vy, vz }
 
+    // Initialize particles directly at turbine
     for (let i = 0; i < smokeCount; i++) {
-        positions[i * 3] = 0; 
-        positions[i * 3 + 1] = 0; 
-        positions[i * 3 + 2] = 0;
+        // 1. Position: Start at turbine with small random offset
+        positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.2;
+        
+        // 2. Velocity: Base exhaust direction + Random Spread
+        const speed = 0.15 + Math.random() * 0.05;
+        const spread = 0.04; // Spread factor
         
         velocities.push({
-            speed: 0.15 + Math.random() * 0.1
+            vx: exhaustDirection.x * speed + (Math.random() - 0.5) * spread,
+            vy: exhaustDirection.y * speed + (Math.random() - 0.5) * spread,
+            vz: exhaustDirection.z * speed + (Math.random() - 0.5) * spread
         });
     }
 
@@ -182,19 +187,36 @@ function updateSmoke() {
     const velocities = smokeParticles.geometry.userData.velocities;
 
     for (let i = 0; i < smokeCount; i++) {
-        positions[i * 3] += exhaustDirection.x * velocities[i].speed;
-        positions[i * 3 + 1] += exhaustDirection.y * velocities[i].speed;
-        positions[i * 3 + 2] += exhaustDirection.z * velocities[i].speed;
+        // 1. Apply Turbulence (Random jitter to velocity)
+        const turbulence = 0.002;
+        velocities[i].vx += (Math.random() - 0.5) * turbulence;
+        velocities[i].vy += (Math.random() - 0.5) * turbulence;
+        velocities[i].vz += (Math.random() - 0.5) * turbulence;
 
+        // 2. Update Position
+        positions[i * 3] += velocities[i].vx;
+        positions[i * 3 + 1] += velocities[i].vy;
+        positions[i * 3 + 2] += velocities[i].vz;
+
+        // 3. Check Distance
         const dx = positions[i * 3] - turbinePosition.x;
         const dy = positions[i * 3 + 1] - turbinePosition.y;
         const dz = positions[i * 3 + 2] - turbinePosition.z;
         const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-        if (dist > 10.0) {
-            positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.5;
-            positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.5;
-            positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.5;
+        if (dist > 8.0) {
+            // Reset Particle
+            // 1. Reset Position
+            positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.2;
+            positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.2;
+            positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.2;
+            
+            // 2. Reset Velocity (Recalculate Spread)
+            const speed = 0.15 + Math.random() * 0.05;
+            const spread = 0.04;
+            velocities[i].vx = exhaustDirection.x * speed + (Math.random() - 0.5) * spread;
+            velocities[i].vy = exhaustDirection.y * speed + (Math.random() - 0.5) * spread;
+            velocities[i].vz = exhaustDirection.z * speed + (Math.random() - 0.5) * spread;
         }
     }
 
@@ -318,10 +340,9 @@ loader.load("models/engine.glb", function(gltf) {
     }
 
     // -----------------------------------------------------
-    // 🔥 FIXED PARTS LOGIC (FIXED FAN EXCLUSION)
+    // FIXED PARTS LOGIC
     // -----------------------------------------------------
     
-    // Helper to check if a mesh is inside the Fan (Child of Fan)
     function isInsideFan(mesh, fanObj) {
         if (!fanObj) return false;
         let parent = mesh.parent;
@@ -332,7 +353,6 @@ loader.load("models/engine.glb", function(gltf) {
         return false;
     }
 
-    // Helper to create a consistent number from a string name
     function getFixedSeed(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -342,23 +362,16 @@ loader.load("models/engine.glb", function(gltf) {
         return Math.abs(hash);
     }
 
-    // Exclude the Fan itself AND anything inside it
     const colorableParts = allMeshes.filter(mesh => {
-        // 1. Exclude if it IS the fan
         if (mesh === fan) return false;
-        
-        // 2. Exclude if it is INSIDE the fan group (e.g. blades)
         if (isInsideFan(mesh, fan)) return false;
-
         return true;
     });
 
-    // Sort by Name Hash instead of Math.random()
     const shuffled = [...colorableParts].sort((a, b) => {
         return getFixedSeed(a.name) - getFixedSeed(b.name);
     });
 
-    // Select 80% of parts
     const numParts = Math.floor(colorableParts.length * 0.72); 
     fixedRandomParts = shuffled.slice(0, numParts);
 
@@ -425,7 +438,6 @@ function applyState(state) {
         vibration = 0;
     } 
     else if (state === "WARNING") {
-        // YELLOW GLOW
         const yellowColor = 0xFFAA00;
         const yellowIntensity = 3.0;
 
@@ -441,7 +453,6 @@ function applyState(state) {
         vibration = 0.02;
     } 
     else if (state === "CRITICAL") {
-        // DEEP HEAT RED
         const redColor = 0xFF2200;
         const redIntensity = 5.0;
 
