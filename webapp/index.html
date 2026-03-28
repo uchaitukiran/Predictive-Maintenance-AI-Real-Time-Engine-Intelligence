@@ -29,6 +29,7 @@
     <button onclick="showRealEngine()">Real Engine</button>
     <button onclick="startAutoTest()">Auto Test</button>
     <button id="btnSound" onclick="toggleSound()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">Sound: OFF</button>
+    <button onclick="toggleThermal()" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">Thermal Vision</button>
 
     <div class="slider-container">
         <label>Environment Rotation</label>
@@ -43,6 +44,28 @@
     <p id="stateText">State: --</p>
     <p id="rulText">RUL: --</p>
 </div>
+
+<!-- REMOVED: OLD HTML DASHBOARD (LIVE TELEMETRY) -->
+<!--
+<div id="dashboard-container">
+    <div id="dashboard-title">Live Telemetry</div>
+    
+    <div class="dashboard-label label-temp">
+        <span>TEMP (°C)</span> <span id="val-temp">0</span>
+    </div>
+    <canvas id="graph-temp" class="dashboard-graph"></canvas>
+
+    <div class="dashboard-label label-press">
+        <span>PRESSURE (psi)</span> <span id="val-press">0</span>
+    </div>
+    <canvas id="graph-press" class="dashboard-graph"></canvas>
+
+    <div class="dashboard-label label-vib">
+        <span>VIBRATION (g)</span> <span id="val-vib">0</span>
+    </div>
+    <canvas id="graph-vib" class="dashboard-graph"></canvas>
+</div>
+-->
 
 <div class="legend">
     <h3>Health Legend</h3>

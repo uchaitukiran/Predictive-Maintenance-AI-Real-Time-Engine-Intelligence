@@ -1,13 +1,35 @@
 // ---------------------------------------------------------
+// VARIABLES & SETTINGS
+// ---------------------------------------------------------
+// Thermal Mode Variables
+let isThermalMode = false;
+let originalMaterials = {}; 
+
+// Dashboard Variables
+let dashboardMesh = null;
+let dashboardCanvas = null;
+let dashboardCtx = null;
+let dashboardTexture = null;
+
+// Data history for graphs
+const historyLength = 50;
+const tempHistory = [];
+const pressHistory = [];
+const vibHistory = [];
+
+for(let i=0; i<historyLength; i++) {
+    tempHistory.push(0);
+    pressHistory.push(0);
+    vibHistory.push(0);
+}
+
+// ---------------------------------------------------------
 // SCENE SETUP
 // ---------------------------------------------------------
 const scene = new THREE.Scene();
-
-// CAMERA
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.5, 6);
 
-// RENDERER
 const renderer = new THREE.WebGLRenderer({
     canvas: document.querySelector("#scene"),
     antialias: true, 
@@ -21,7 +43,6 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding; 
 
-// CONTROLS
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05; 
@@ -37,18 +58,10 @@ let composer = null;
 function setupPostProcessing() {
     if (typeof THREE.EffectComposer !== 'undefined') {
         composer = new THREE.EffectComposer(renderer);
-        
         const renderPass = new THREE.RenderPass(scene, camera);
         composer.addPass(renderPass);
-
-        const bloomPass = new THREE.UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.5,  // Strength
-            0.3,  // Radius
-            0.9   // Threshold
-        );
+        const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.3, 0.9);
         composer.addPass(bloomPass);
-
         if (typeof THREE.FXAAShader !== 'undefined') {
             const fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
             const pixelRatio = renderer.getPixelRatio();
@@ -62,7 +75,6 @@ function setupPostProcessing() {
 // ENVIRONMENT (HDRI)
 // ---------------------------------------------------------
 let skySphere = null;
-
 function createSkySphere(texture) {
     const geometry = new THREE.SphereGeometry(500, 60, 40);
     geometry.scale(-1, 1, 1); 
@@ -70,15 +82,12 @@ function createSkySphere(texture) {
     skySphere = new THREE.Mesh(geometry, material);
     scene.add(skySphere);
 }
-
 const rgbeLoader = new THREE.RGBELoader();
 rgbeLoader.load("hdri/env.hdr", function(texture) {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
     createSkySphere(texture);
-}, undefined, function(err) {
-    console.error("HDRI Error", err);
-});
+}, undefined, function(err) { console.error("HDRI Error", err); });
 
 // ---------------------------------------------------------
 // GROUND & SHADOWS
@@ -120,10 +129,8 @@ scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0xffffff, 1.5);
 fillLight.position.set(-10, 5, 5);
 scene.add(fillLight);
-
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
-
 const hemiLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
 scene.add(hemiLight);
 
@@ -147,26 +154,16 @@ function createSmokeSystem() {
     ctx.fillRect(0, 0, 64, 64);
     
     const smokeTexture = new THREE.CanvasTexture(canvas);
-    const smokeMaterial = new THREE.PointsMaterial({
-        size: 5.0, 
-        map: smokeTexture,
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
-        blending: THREE.NormalBlending
-    });
-
+    const smokeMaterial = new THREE.PointsMaterial({ size: 5.0, map: smokeTexture, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.NormalBlending });
     const smokeGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(smokeCount * 3);
     const velocities = [];
-
     for (let i = 0; i < smokeCount; i++) {
         positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.2;
         positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.2;
         positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.2;
         velocities.push({ vx: 0, vy: 0, vz: 0 });
     }
-
     smokeGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     smokeGeometry.userData.velocities = velocities;
     smokeParticles = new THREE.Points(smokeGeometry, smokeMaterial);
@@ -188,8 +185,7 @@ function updateSmoke() {
             positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.2;
             positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.2;
             positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.2;
-            const speed = 0.15 + Math.random() * 0.05;
-            const spread = 0.04;
+            const speed = 0.15 + Math.random() * 0.05; const spread = 0.04;
             velocities[i].vx = exhaustDirection.x * speed + (Math.random() - 0.5) * spread;
             velocities[i].vy = exhaustDirection.y * speed + (Math.random() - 0.5) * spread;
             velocities[i].vz = exhaustDirection.z * speed + (Math.random() - 0.5) * spread;
@@ -217,32 +213,19 @@ function createFireSystem() {
     ctx.fillRect(0, 0, 64, 64);
     
     const fireTexture = new THREE.CanvasTexture(canvas);
-    const fireMaterial = new THREE.PointsMaterial({
-        size: 2.0, 
-        map: fireTexture,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
-    });
-
+    const fireMaterial = new THREE.PointsMaterial({ size: 2.0, map: fireTexture, transparent: true, opacity: 1.0, depthWrite: false, blending: THREE.AdditiveBlending });
     const fireGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(fireCount * 3);
     const velocities = [];
     const colors = new Float32Array(fireCount * 3);
-
     for (let i = 0; i < fireCount; i++) {
-        positions[i * 3] = 0; 
-        positions[i * 3 + 1] = 0; 
-        positions[i * 3 + 2] = 0;
+        positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0;
         velocities.push({ vx: 0, vy: 0, vz: 0, life: 0 });
         colors[i * 3] = 1.0; colors[i * 3 + 1] = 0.2; colors[i * 3 + 2] = 0.0;
     }
-
     fireGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     fireGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     fireGeometry.userData.velocities = velocities;
-
     fireParticles = new THREE.Points(fireGeometry, fireMaterial);
     fireParticles.frustumCulled = false;
     fireParticles.visible = false;
@@ -251,58 +234,40 @@ function createFireSystem() {
 
 function updateFire() {
     if (!fireParticles || !fireParticles.visible) return;
-
     const positions = fireParticles.geometry.attributes.position.array;
     const colors = fireParticles.geometry.attributes.color.array;
     const velocities = fireParticles.geometry.userData.velocities;
-
     for (let i = 0; i < fireCount; i++) {
         positions[i * 3] += velocities[i].vx;
         positions[i * 3 + 1] += velocities[i].vy;
         positions[i * 3 + 2] += velocities[i].vz;
-        
         velocities[i].life -= 0.04;
-
         if (velocities[i].life <= 0) {
             positions[i * 3] = turbinePosition.x + (Math.random() - 0.5) * 0.3;
             positions[i * 3 + 1] = turbinePosition.y + (Math.random() - 0.5) * 0.3;
             positions[i * 3 + 2] = turbinePosition.z + (Math.random() - 0.5) * 0.3;
-            
-            const speed = 0.4 + Math.random() * 0.2;
-            const spread = 0.1;
+            const speed = 0.4 + Math.random() * 0.2; const spread = 0.1;
             velocities[i].vx = exhaustDirection.x * speed + (Math.random() - 0.5) * spread;
             velocities[i].vy = exhaustDirection.y * speed + (Math.random() - 0.5) * spread;
             velocities[i].vz = exhaustDirection.z * speed + (Math.random() - 0.5) * spread;
             velocities[i].life = 1.0;
-
             colors[i * 3] = 1.0; colors[i * 3 + 1] = 0.8; colors[i * 3 + 2] = 0.2;
         } else {
-            colors[i * 3] = 1.0; 
-            colors[i * 3 + 1] *= 0.96; 
-            colors[i * 3 + 2] *= 0.9;
+            colors[i * 3] = 1.0; colors[i * 3 + 1] *= 0.96; colors[i * 3 + 2] *= 0.9;
         }
     }
-
     fireParticles.geometry.attributes.position.needsUpdate = true;
     fireParticles.geometry.attributes.color.needsUpdate = true;
 }
 
 // ---------------------------------------------------------
-// SPARKS SYSTEM (TURBINE + DETAILS + FAN)
+// SPARKS SYSTEM
 // ---------------------------------------------------------
 let sparkParticles = null;
-const sparkCount = 450; // Increased count for 3 sources
+const sparkCount = 450; 
 let sparkTempVec = new THREE.Vector3();
-
-// Mesh References
-let turbineMesh = null;
-let detailsMesh = null;
-let fanMesh = null;
-
-// Geometry Attributes
-let turbineGeometryAttr = null;
-let detailsGeometryAttr = null;
-let fanGeometryAttr = null;
+let turbineMesh = null, detailsMesh = null, fanMesh = null;
+let turbineGeometryAttr = null, detailsGeometryAttr = null, fanGeometryAttr = null;
 
 function createSparkSystem() {
     const canvas = document.createElement('canvas');
@@ -312,125 +277,65 @@ function createSparkSystem() {
     gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
     gradient.addColorStop(0.3, 'rgba(255, 255, 100, 0.8)');
     gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 32, 32);
     
     const sparkTexture = new THREE.CanvasTexture(canvas);
-    const sparkMaterial = new THREE.PointsMaterial({
-        size: 0.15, 
-        map: sparkTexture,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
-    });
-
+    const sparkMaterial = new THREE.PointsMaterial({ size: 0.15, map: sparkTexture, transparent: true, opacity: 1.0, depthWrite: false, blending: THREE.AdditiveBlending });
     const sparkGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(sparkCount * 3);
     const velocities = [];
-
-    for (let i = 0; i < sparkCount; i++) {
-        positions[i * 3] = 0;
-        positions[i * 3 + 1] = 0;
-        positions[i * 3 + 2] = 0;
-        velocities.push({ vx: 0, vy: 0, vz: 0, life: 0 });
-    }
-
+    for (let i = 0; i < sparkCount; i++) { positions[i * 3] = 0; positions[i * 3 + 1] = 0; positions[i * 3 + 2] = 0; velocities.push({ vx: 0, vy: 0, vz: 0, life: 0 }); }
     sparkGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     sparkGeometry.userData.velocities = velocities;
-
     sparkParticles = new THREE.Points(sparkGeometry, sparkMaterial);
-    sparkParticles.frustumCulled = false;
-    sparkParticles.visible = false;
+    sparkParticles.frustumCulled = false; sparkParticles.visible = false;
     scene.add(sparkParticles);
 }
 
 function updateSparks() {
     if (!sparkParticles || !sparkParticles.visible) return;
-
     const positions = sparkParticles.geometry.attributes.position.array;
     const velocities = sparkParticles.geometry.userData.velocities;
-
     for (let i = 0; i < sparkCount; i++) {
-        // Gravity
         velocities[i].vy -= 0.01; 
-
-        positions[i * 3] += velocities[i].vx;
-        positions[i * 3 + 1] += velocities[i].vy;
-        positions[i * 3 + 2] += velocities[i].vz;
-
+        positions[i * 3] += velocities[i].vx; positions[i * 3 + 1] += velocities[i].vy; positions[i * 3 + 2] += velocities[i].vz;
         velocities[i].life -= 0.02;
-
         if (velocities[i].life <= 0) {
-            
-            let spawnPos = turbinePosition; // Fallback
-            
-            // 🔥 RANDOM SOURCE SELECTION (3 Sources)
-            // 0 - 0.33 : Turbine (Backward)
-            // 0.33 - 0.66 : Details (Fall)
-            // 0.66 - 1.0 : Fan (Forward)
+            let spawnPos = turbinePosition;
             const sourceChoice = Math.random();
-            
-            // --- TURBINE ---
             if (sourceChoice < 0.33 && turbineGeometryAttr) {
                 const idx = Math.floor(Math.random() * turbineGeometryAttr.count);
                 sparkTempVec.fromBufferAttribute(turbineGeometryAttr, idx);
-                if (turbineMesh) turbineMesh.localToWorld(sparkTempVec);
-                spawnPos = sparkTempVec;
-
-                // Velocity: Backward
+                if (turbineMesh) turbineMesh.localToWorld(sparkTempVec); spawnPos = sparkTempVec;
                 const splitSpeed = 0.1 + Math.random() * 0.1;
                 velocities[i].vx = exhaustDirection.x * splitSpeed + (Math.random() - 0.5) * 0.05;
                 velocities[i].vy = exhaustDirection.y * splitSpeed + (Math.random() - 0.5) * 0.05;
                 velocities[i].vz = exhaustDirection.z * splitSpeed + (Math.random() - 0.5) * 0.05;
-            } 
-            // --- DETAILS ---
-            else if (sourceChoice < 0.66 && detailsGeometryAttr) {
+            } else if (sourceChoice < 0.66 && detailsGeometryAttr) {
                 const idx = Math.floor(Math.random() * detailsGeometryAttr.count);
                 sparkTempVec.fromBufferAttribute(detailsGeometryAttr, idx);
-                if (detailsMesh) detailsMesh.localToWorld(sparkTempVec);
-                spawnPos = sparkTempVec;
-
-                // Velocity: Fall Down
-                velocities[i].vx = (Math.random() - 0.5) * 0.02;
-                velocities[i].vy = -0.02; 
-                velocities[i].vz = (Math.random() - 0.5) * 0.02;
-            } 
-            // --- FAN (Front Side) ---
-            else if (fanGeometryAttr) {
+                if (detailsMesh) detailsMesh.localToWorld(sparkTempVec); spawnPos = sparkTempVec;
+                velocities[i].vx = (Math.random() - 0.5) * 0.02; velocities[i].vy = -0.02; velocities[i].vz = (Math.random() - 0.5) * 0.02;
+            } else if (fanGeometryAttr) {
                 const idx = Math.floor(Math.random() * fanGeometryAttr.count);
                 sparkTempVec.fromBufferAttribute(fanGeometryAttr, idx);
-                if (fanMesh) fanMesh.localToWorld(sparkTempVec);
-                spawnPos = sparkTempVec;
-
-                // Velocity: Forward (Opposite of Exhaust)
-                // exhaustDirection is Fan -> Turbine. 
-                // Front is -(exhaustDirection)
+                if (fanMesh) fanMesh.localToWorld(sparkTempVec); spawnPos = sparkTempVec;
                 const splitSpeed = 0.1 + Math.random() * 0.1;
                 velocities[i].vx = -exhaustDirection.x * splitSpeed + (Math.random() - 0.5) * 0.05;
                 velocities[i].vy = -exhaustDirection.y * splitSpeed + (Math.random() - 0.5) * 0.05;
                 velocities[i].vz = -exhaustDirection.z * splitSpeed + (Math.random() - 0.5) * 0.05;
-            }
-            // Fallback if geometry missing
-            else if (turbineGeometryAttr) {
+            } else if (turbineGeometryAttr) {
                  const idx = Math.floor(Math.random() * turbineGeometryAttr.count);
                  sparkTempVec.fromBufferAttribute(turbineGeometryAttr, idx);
-                 if (turbineMesh) turbineMesh.localToWorld(sparkTempVec);
-                 spawnPos = sparkTempVec;
-                 velocities[i].vx = (Math.random() - 0.5) * 0.05;
-                 velocities[i].vy = -0.02;
-                 velocities[i].vz = (Math.random() - 0.5) * 0.05;
+                 if (turbineMesh) turbineMesh.localToWorld(sparkTempVec); spawnPos = sparkTempVec;
+                 velocities[i].vx = (Math.random() - 0.5) * 0.05; velocities[i].vy = -0.02; velocities[i].vz = (Math.random() - 0.5) * 0.05;
             }
-
-            // Apply position with scatter
             positions[i * 3] = spawnPos.x + (Math.random() - 0.5) * 0.5;
             positions[i * 3 + 1] = spawnPos.y + (Math.random() - 0.5) * 0.5;
             positions[i * 3 + 2] = spawnPos.z + (Math.random() - 0.5) * 0.5;
-
             velocities[i].life = 1.0;
         }
     }
-
     sparkParticles.geometry.attributes.position.needsUpdate = true;
 }
 
@@ -441,27 +346,10 @@ const soundEngine = document.getElementById('soundEngine');
 const soundWarning = document.getElementById('soundWarning');
 const soundAlarm = document.getElementById('soundAlarm');
 const btnSound = document.getElementById('btnSound');
-
 let isMuted = true;
-
-function toggleSound() {
-    try {
-        isMuted = !isMuted;
-        if (isMuted) { btnSound.innerText = "Sound: OFF"; stopAllAudio(); }
-        else { btnSound.innerText = "Sound: ON"; const stateText = document.getElementById("stateText").innerText.split(": ")[1]; playSoundForState(stateText); }
-    } catch (e) { console.log("Sound error", e); }
-}
-
+function toggleSound() { try { isMuted = !isMuted; if (isMuted) { btnSound.innerText = "Sound: OFF"; stopAllAudio(); } else { btnSound.innerText = "Sound: ON"; const stateText = document.getElementById("stateText").innerText.split(": ")[1]; playSoundForState(stateText); } } catch (e) { console.log("Sound error", e); } }
 function stopAllAudio() { try { if(soundEngine) soundEngine.pause(); if(soundWarning) soundWarning.pause(); if(soundAlarm) soundAlarm.pause(); } catch (e) {} }
-
-function playSoundForState(state) {
-    if (isMuted) return; stopAllAudio();
-    try {
-        if (state === "GOOD") { if(soundEngine) soundEngine.play(); }
-        else if (state === "WARNING") { if(soundWarning) soundWarning.play(); }
-        else if (state === "CRITICAL") { if(soundAlarm) soundAlarm.play(); }
-    } catch (e) { console.log("Audio play failed", e); }
-}
+function playSoundForState(state) { if (isMuted) return; stopAllAudio(); try { if (state === "GOOD") { if(soundEngine) soundEngine.play(); } else if (state === "WARNING") { if(soundWarning) soundWarning.play(); } else if (state === "CRITICAL") { if(soundAlarm) soundAlarm.play(); } } catch (e) { console.log("Audio play failed", e); } }
 
 // ---------------------------------------------------------
 // VARIABLES
@@ -476,42 +364,25 @@ let vibration = 0;
 // LOAD MODEL
 // ---------------------------------------------------------
 const loader = new THREE.GLTFLoader();
-
 loader.load("models/engine.glb", function(gltf) {
-
-    model = gltf.scene;
-    model.scale.set(3, 3, 3);
-
+    model = gltf.scene; model.scale.set(3, 3, 3);
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-
-    model.position.x = -center.x;
-    model.position.z = -center.z;
-    model.position.y = -box.min.y; 
-    model.userData.baseY = model.position.y;
-
+    model.position.x = -center.x; model.position.z = -center.z; model.position.y = -box.min.y; model.userData.baseY = model.position.y;
     scene.add(model);
-
-    const focusTarget = new THREE.Vector3(0, size.y * 0.3, 0); 
-    controls.target.copy(focusTarget);
-    camera.lookAt(focusTarget);
+    const focusTarget = new THREE.Vector3(0, size.y * 0.3, 0); controls.target.copy(focusTarget); camera.lookAt(focusTarget);
     const maxDim = Math.max(size.x, size.y, size.z);
     camera.position.set(0, size.y * 0.5, maxDim * 1.5);
-
     model.traverse(function(child) {
         if (child.isMesh) {
             if (child.material) { child.material = child.material.clone(); }
-            child.castShadow = true;
-            child.receiveShadow = true;
-            child.material.envMapIntensity = 1.5;
+            child.castShadow = true; child.receiveShadow = true; child.material.envMapIntensity = 1.5;
             const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
             if (child.material.map) child.material.map.anisotropy = maxAnisotropy;
             allMeshes.push(child);
         }
     });
-
-    // Identify parts
     model.traverse((obj) => {
         if (obj.name === "fan_rotor") fan = obj;
         if (obj.name === "compressor_rotor") compressor = obj;
@@ -519,79 +390,22 @@ loader.load("models/engine.glb", function(gltf) {
         if (obj.name === "engine_body") body = obj;
         if (obj.name === "engine_details") details = obj;
     });
-
     if (!fan) fan = model.children[0];
-
-    // Calculate Direction
     if (fan && turbine) {
-        const fanPos = new THREE.Vector3();
-        fan.getWorldPosition(fanPos);
-        turbinePosition = new THREE.Vector3();
-        turbine.getWorldPosition(turbinePosition);
-        exhaustDirection.subVectors(turbinePosition, fanPos);
-        exhaustDirection.normalize();
+        const fanPos = new THREE.Vector3(); fan.getWorldPosition(fanPos);
+        turbinePosition = new THREE.Vector3(); turbine.getWorldPosition(turbinePosition);
+        exhaustDirection.subVectors(turbinePosition, fanPos); exhaustDirection.normalize();
     }
-
-    // -----------------------------------------------------
-    // FIXED PARTS LOGIC (Glowing)
-    // -----------------------------------------------------
-    
-    function isInsideFan(mesh, fanObj) {
-        if (!fanObj) return false; let parent = mesh.parent;
-        while (parent) { if (parent === fanObj) return true; parent = parent.parent; }
-        return false;
-    }
+    function isInsideFan(mesh, fanObj) { if (!fanObj) return false; let parent = mesh.parent; while (parent) { if (parent === fanObj) return true; parent = parent.parent; } return false; }
     function getFixedSeed(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return Math.abs(hash); }
-
-    const colorableParts = allMeshes.filter(mesh => {
-        if (mesh === fan) return false;
-        if (isInsideFan(mesh, fan)) return false;
-        return true;
-    });
-
+    const colorableParts = allMeshes.filter(mesh => { if (mesh === fan) return false; if (isInsideFan(mesh, fan)) return false; return true; });
     const shuffled = [...colorableParts].sort((a, b) => { return getFixedSeed(a.name) - getFixedSeed(b.name); });
-    const numParts = Math.floor(colorableParts.length * 0.7); 
-    fixedRandomParts = shuffled.slice(0, numParts);
-
-    // -----------------------------------------------------
-    // 🔥 FIND MESHES & GEOMETRIES
-    // -----------------------------------------------------
-    
-    // 1. Turbine
-    turbineMesh = null;
-    turbineGeometryAttr = null;
-    if (turbine) {
-        turbine.traverse((child) => { if (child.isMesh && !turbineMesh) turbineMesh = child; });
-        if (!turbineMesh && turbine.isMesh) turbineMesh = turbine;
-        if (turbineMesh && turbineMesh.geometry) turbineGeometryAttr = turbineMesh.geometry.attributes.position;
-    }
-
-    // 2. Details
-    detailsMesh = null;
-    detailsGeometryAttr = null;
-    if (details) {
-        details.traverse((child) => { if (child.isMesh && !detailsMesh) detailsMesh = child; });
-        if (!detailsMesh && details.isMesh) detailsMesh = details;
-        if (detailsMesh && detailsMesh.geometry) detailsGeometryAttr = detailsMesh.geometry.attributes.position;
-    }
-
-    // 3. Fan (New)
-    fanMesh = null;
-    fanGeometryAttr = null;
-    if (fan) {
-        fan.traverse((child) => { if (child.isMesh && !fanMesh) fanMesh = child; });
-        if (!fanMesh && fan.isMesh) fanMesh = fan;
-        if (fanMesh && fanMesh.geometry) fanGeometryAttr = fanMesh.geometry.attributes.position;
-    }
-
-    console.log("Sparks Sources -> Turbine: " + (turbineGeometryAttr ? turbineGeometryAttr.count : 0) + ", Details: " + (detailsGeometryAttr ? detailsGeometryAttr.count : 0) + ", Fan: " + (fanGeometryAttr ? fanGeometryAttr.count : 0));
-
+    fixedRandomParts = shuffled.slice(0, Math.floor(colorableParts.length * 0.7));
+    if (turbine) { turbine.traverse((child) => { if (child.isMesh && !turbineMesh) turbineMesh = child; }); if (!turbineMesh && turbine.isMesh) turbineMesh = turbine; if (turbineMesh && turbineMesh.geometry) turbineGeometryAttr = turbineMesh.geometry.attributes.position; }
+    if (details) { details.traverse((child) => { if (child.isMesh && !detailsMesh) detailsMesh = child; }); if (!detailsMesh && details.isMesh) detailsMesh = details; if (detailsMesh && detailsMesh.geometry) detailsGeometryAttr = detailsMesh.geometry.attributes.position; }
+    if (fan) { fan.traverse((child) => { if (child.isMesh && !fanMesh) fanMesh = child; }); if (!fanMesh && fan.isMesh) fanMesh = fan; if (fanMesh && fanMesh.geometry) fanGeometryAttr = fanMesh.geometry.attributes.position; }
     setupPostProcessing();
-    createSmokeSystem(); 
-    createFireSystem(); 
-    createSparkSystem();
-    getPrediction();
-
+    createSmokeSystem(); createFireSystem(); createSparkSystem(); createDashboard(); getPrediction();
 });
 
 // ---------------------------------------------------------
@@ -599,86 +413,27 @@ loader.load("models/engine.glb", function(gltf) {
 // ---------------------------------------------------------
 async function getPrediction() {
     try {
-        const res = await fetch("http://127.0.0.1:5000/predict", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ temperature: 85, pressure: 30, vibration: 0.3 })
-        });
+        const res = await fetch("http://127.0.0.1:5000/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: 85, pressure: 30, vibration: 0.3 }) });
         const data = await res.json();
         document.getElementById("stateText").innerText = "State: " + data.state;
         document.getElementById("rulText").innerText = "RUL: " + data.Predicted_RUL.toFixed(2);
         applyState(data.state);
-    } catch (err) {
-        console.error("API Error:", err);
-        document.getElementById("stateText").innerText = "State: Server Offline";
-        applyState("WARNING");
-    }
+    } catch (err) { console.error("API Error:", err); document.getElementById("stateText").innerText = "State: Server Offline"; applyState("WARNING"); }
 }
-
-function resetColors() {
-    allMeshes.forEach(function(obj) { obj.material.emissive.set(0x000000); obj.material.emissiveIntensity = 0; obj.userData.colorType = "none"; });
-}
-
-function setGroupColor(groupObj, colorHex, type) {
-    if (!groupObj) return;
-    if (groupObj.children && groupObj.children.length > 0) {
-        groupObj.traverse((child) => { if (child.isMesh) { child.material.emissive.set(colorHex); child.userData.colorType = type; } });
-    } else if (groupObj.isMesh) { groupObj.material.emissive.set(colorHex); groupObj.userData.colorType = type; }
-}
-
+function resetColors() { allMeshes.forEach(function(obj) { obj.material.emissive.set(0x000000); obj.material.emissiveIntensity = 0; obj.userData.colorType = "none"; }); }
+function setGroupColor(groupObj, colorHex, type) { if (!groupObj) return; if (groupObj.children && groupObj.children.length > 0) { groupObj.traverse((child) => { if (child.isMesh) { child.material.emissive.set(colorHex); child.userData.colorType = type; } }); } else if (groupObj.isMesh) { groupObj.material.emissive.set(colorHex); groupObj.userData.colorType = type; } }
 function applyState(state) {
-    
     resetColors();
-
-    if (smokeParticles) smokeParticles.visible = false;
-    if (fireParticles) fireParticles.visible = false;
-    if (sparkParticles) sparkParticles.visible = false;
-
-    if (state === "GOOD") {
-        rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 };
-        vibration = 0;
-    } 
-    else if (state === "WARNING") {
-        const yellowColor = 0xFFAA00; const yellowIntensity = 3.0;
-        setGroupColor(compressor, yellowColor, "yellow");
-        fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; });
-        rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02;
-    } 
-    else if (state === "CRITICAL") {
-        const redColor = 0xFF0000; 
-        const redIntensity = 4.0; 
-
-        setGroupColor(turbine, redColor, "red");
-
-        fixedRandomParts.forEach(part => {
-            part.material.emissive.set(redColor);
-            part.material.emissiveIntensity = redIntensity;
-            part.userData.colorType = "red";
-        });
-
-        if (smokeParticles) smokeParticles.visible = true;
-        if (fireParticles) fireParticles.visible = true;
-        if (sparkParticles) sparkParticles.visible = true;
-
-        rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 };
-        vibration = 0.08;
-    }
-
+    if (smokeParticles) smokeParticles.visible = false; if (fireParticles) fireParticles.visible = false; if (sparkParticles) sparkParticles.visible = false;
+    if (state === "GOOD") { rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 }; vibration = 0; } 
+    else if (state === "WARNING") { const yellowColor = 0xFFAA00; const yellowIntensity = 3.0; setGroupColor(compressor, yellowColor, "yellow"); fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; }); rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02; } 
+    else if (state === "CRITICAL") { const redColor = 0xFF0000; const redIntensity = 4.0; setGroupColor(turbine, redColor, "red"); fixedRandomParts.forEach(part => { part.material.emissive.set(redColor); part.material.emissiveIntensity = redIntensity; part.userData.colorType = "red"; }); if (smokeParticles) smokeParticles.visible = true; if (fireParticles) fireParticles.visible = true; if (sparkParticles) sparkParticles.visible = true; rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 }; vibration = 0.08; }
     document.getElementById("stateText").innerText = "State: " + state;
     playSoundForState(state);
 }
-
 let autoInterval = null;
-function startAutoTest() {
-    if (autoInterval) clearInterval(autoInterval);
-    const states = ["GOOD", "WARNING", "CRITICAL"]; let i = 0;
-    autoInterval = setInterval(() => { applyState(states[i]); i = (i + 1) % states.length; }, 2000);
-}
-
-function showRealEngine() {
-    if (autoInterval) clearInterval(autoInterval);
-    resetColors();
-    setTimeout(() => { applyState("WARNING"); }, 3000);
-}
+function startAutoTest() { if (autoInterval) clearInterval(autoInterval); const states = ["GOOD", "WARNING", "CRITICAL"]; let i = 0; autoInterval = setInterval(() => { applyState(states[i]); i = (i + 1) % states.length; }, 2000); }
+function showRealEngine() { if (autoInterval) clearInterval(autoInterval); resetColors(); setTimeout(() => { applyState("WARNING"); }, 3000); }
 
 // ---------------------------------------------------------
 // ANIMATION LOOP
@@ -686,63 +441,111 @@ function showRealEngine() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
-
     const rotSlider = document.getElementById('rotationSlider');
     if (skySphere && rotSlider) { const angle = rotSlider.value * (Math.PI / 180); skySphere.rotation.y = angle; }
-
     if (fan) fan.rotation.x += rotationSpeed.fan;
     if (compressor) compressor.rotation.x += rotationSpeed.compressor;
     if (turbine) turbine.rotation.x += rotationSpeed.turbine;
-
     const time = Date.now() * 0.002;
-    
-    // Breathing Animation
-    allMeshes.forEach((obj) => {
-        if (obj.userData.colorType === "yellow") {
-            const pulse = Math.sin(time + obj.position.x);
-            obj.material.emissiveIntensity = 3.0 + pulse * 1.0;
-        } 
-        else if (obj.userData.colorType === "red") {
-            const wave = Math.sin(time * 2.0 - obj.position.x * 3.0);
-            obj.material.emissiveIntensity = 4.0 + wave * 1.5;
-        }
-    });
-
-    updateSmoke();
-    updateFire(); 
-    updateSparks();
-
-    if (model) {
-        if (model.userData.baseY === undefined) model.userData.baseY = model.position.y;
-        if (vibration > 0) {
-            model.position.x = (Math.random() - 0.5) * vibration;
-            model.position.y = model.userData.baseY + (Math.random() - 0.5) * vibration;
-        } else { model.position.x = 0; model.position.y = model.userData.baseY; }
-    }
-
-    if (composer) composer.render();
-    else renderer.render(scene, camera);
+    allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 3.0 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
+    updateSmoke(); updateFire(); updateSparks();
+    const currentState = document.getElementById("stateText").innerText.split(": ")[1];
+    updateDashboard(currentState);
+    if (dashboardMesh) dashboardMesh.lookAt(camera.position);
+    if (model) { if (model.userData.baseY === undefined) model.userData.baseY = model.position.y; if (vibration > 0) { model.position.x = (Math.random() - 0.5) * vibration; model.position.y = model.userData.baseY + (Math.random() - 0.5) * vibration; } else { model.position.x = 0; model.position.y = model.userData.baseY; } }
+    if (composer) composer.render(); else renderer.render(scene, camera);
 }
-
-window.addEventListener("load", () => {
-    document.getElementById("btnBody").onclick = () => { if(body) body.visible = !body.visible; };
-    document.getElementById("btnDetails").onclick = () => { if(details) details.visible = !details.visible; };
-});
-
+window.addEventListener("load", () => { document.getElementById("btnBody").onclick = () => { if(body) body.visible = !body.visible; }; document.getElementById("btnDetails").onclick = () => { if(details) details.visible = !details.visible; }; });
 window.addEventListener("resize", function() {
     const width = window.innerWidth; const height = window.innerHeight;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-    if (composer) {
-        composer.setSize(width, height);
-        composer.passes.forEach(pass => {
-            if (pass.uniforms && pass.uniforms['resolution']) {
-                const pixelRatio = renderer.getPixelRatio();
-                pass.uniforms['resolution'].value.set(1.0 / (width * pixelRatio), 1.0 / (height * pixelRatio));
-            }
-        });
-    }
+    camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height);
+    if (composer) { composer.setSize(width, height); composer.passes.forEach(pass => { if (pass.uniforms && pass.uniforms['resolution']) { const pixelRatio = renderer.getPixelRatio(); pass.uniforms['resolution'].value.set(1.0 / (width * pixelRatio), 1.0 / (height * pixelRatio)); } }); }
 });
-
 animate();
+
+// ---------------------------------------------------------
+// THERMAL VISION MODE
+// ---------------------------------------------------------
+function toggleThermal() { isThermalMode = !isThermalMode; if (isThermalMode) { applyThermalColors(); } else { restoreOriginalColors(); } }
+function applyThermalColors() {
+    if (Object.keys(originalMaterials).length === 0) { allMeshes.forEach(obj => { originalMaterials[obj.uuid] = { emissive: obj.material.emissive.getHex(), intensity: obj.material.emissiveIntensity }; }); }
+    allMeshes.forEach(obj => {
+        let heatColor = 0x000000; 
+        if (obj.userData.colorType === "red" || obj.name.toLowerCase().includes("turbine")) { heatColor = 0xFF2200; obj.material.emissiveIntensity = 2.0; } 
+        else if (obj.userData.colorType === "yellow" || obj.name.toLowerCase().includes("compressor")) { heatColor = 0xFFAA00; obj.material.emissiveIntensity = 1.5; } 
+        else if (obj.name.toLowerCase().includes("fan")) { heatColor = 0x00FFFF; obj.material.emissiveIntensity = 0.8; } 
+        else { heatColor = 0x003366; obj.material.emissiveIntensity = 0.5; }
+        obj.material.emissive.setHex(heatColor);dashboardCtx.font
+    });
+}
+function restoreOriginalColors() { allMeshes.forEach(obj => { if (originalMaterials[obj.uuid]) { obj.material.emissive.setHex(originalMaterials[obj.uuid].emissive); obj.material.emissiveIntensity = originalMaterials[obj.uuid].intensity; } }); applyState(document.getElementById("stateText").innerText.split(": ")[1]); }
+
+// ---------------------------------------------------------
+// FEATURE 1: GLASS DASHBOARD SYSTEM (FIXED CRITICAL OVERLAP)
+// ---------------------------------------------------------
+function createDashboard() {
+    dashboardCanvas = document.createElement('canvas'); dashboardCanvas.width = 512; dashboardCanvas.height = 256;
+    dashboardCtx = dashboardCanvas.getContext('2d'); dashboardTexture = new THREE.CanvasTexture(dashboardCanvas); dashboardTexture.minFilter = THREE.LinearFilter;
+    const planeGeo = new THREE.PlaneGeometry(5, 2.5);
+    const planeMat = new THREE.MeshBasicMaterial({ map: dashboardTexture, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.9 });
+    dashboardMesh = new THREE.Mesh(planeGeo, planeMat);
+    dashboardMesh.position.set(-0.5, 6.4, 0.3);
+    scene.add(dashboardMesh);
+}
+
+function updateDashboard(state) {
+    if (!dashboardCtx) return;
+    let baseTemp = 800, basePress = 20, baseVib = 0.1;
+    if (state === "WARNING") { baseTemp = 950; baseVib = 0.4; } else if (state === "CRITICAL") { baseTemp = 1100; basePress = 28; baseVib = 0.8; }
+    const newTemp = baseTemp + (Math.random() * 50 - 25), newPress = basePress + (Math.random() * 2 - 1), newVib = baseVib + (Math.random() * 0.05);
+    tempHistory.push(newTemp); tempHistory.shift(); pressHistory.push(newPress); pressHistory.shift(); vibHistory.push(newVib); vibHistory.shift();
+
+    // 1. Clear and Draw Background
+    dashboardCtx.clearRect(0, 0, 512, 256);
+    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.6)'; 
+    dashboardCtx.beginPath(); 
+    dashboardCtx.roundRect(10, 10, 492, 236, 10); 
+    dashboardCtx.fill();
+
+    // 2. Draw Border
+    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.5)'; dashboardCtx.lineWidth = 2; dashboardCtx.stroke();
+
+    // 3. Draw Title
+    dashboardCtx.font = "bold 24px Arial"; dashboardCtx.fillStyle = "#00ffff"; dashboardCtx.shadowColor = '#00ffff'; dashboardCtx.shadowBlur = 10; 
+    dashboardCtx.fillText("SENSOR DATA", 20, 40); 
+    dashboardCtx.shadowBlur = 0; 
+
+    // 4. Draw Separator
+    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.3)'; dashboardCtx.beginPath(); dashboardCtx.moveTo(20, 50); dashboardCtx.lineTo(492, 50); dashboardCtx.stroke();
+
+    // 5. Draw Helper Function
+    // yBase is the bottom line of the graph. 
+    // Graph draws UPWARDS (y - height).
+    function drawGraph(data, color, yMin, yMax, yBase) {
+        dashboardCtx.strokeStyle = color; dashboardCtx.lineWidth = 2; dashboardCtx.shadowColor = color; dashboardCtx.shadowBlur = 5; dashboardCtx.beginPath();
+        data.forEach((val, index) => { const x = 20 + (index / historyLength) * 470; const y = yBase - ((val - yMin) / (yMax - yMin)) * 40; if (index === 0) dashboardCtx.moveTo(x, y); else dashboardCtx.lineTo(x, y); });
+        dashboardCtx.stroke(); dashboardCtx.shadowBlur = 0;
+    }
+
+    // 6. Draw Data (Spaced perfectly)
+
+    // --- TEMP (Top Section) ---
+    // Text at 60. Graph Base at 105. Height 40px. Peaks at 65.
+    dashboardCtx.font = "14px Arial"; dashboardCtx.fillStyle = "#ff4444"; 
+    dashboardCtx.fillText("TEMP: " + Math.round(newTemp) + "°C", 20, 75);
+    drawGraph(tempHistory, '#ff4444', 700, 1200, 115);
+
+    // --- PRES (Middle Section) ---
+    // Text at 125. Graph Base at 170. Height 40px. Peaks at 130.
+    dashboardCtx.fillStyle = "#44ff44"; 
+    dashboardCtx.fillText("PRES: " + newPress.toFixed(1) + " psi", 20, 125);
+    drawGraph(pressHistory, '#44ff44', 10, 40, 170);
+
+    // --- VIB (Bottom Section) ---
+    // Text at 190. Graph Base at 235. Height 40px. Peaks at 195.
+    dashboardCtx.fillStyle = "#4488ff"; 
+    dashboardCtx.fillText("VIB: " + newVib.toFixed(2) + "g", 20, 190);
+    drawGraph(vibHistory, '#4488ff', 0, 1.0, 235);
+
+    dashboardTexture.needsUpdate = true;
+}

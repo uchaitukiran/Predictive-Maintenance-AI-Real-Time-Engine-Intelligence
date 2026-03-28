@@ -158,3 +158,52 @@ canvas {
 .green { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
 .yellow { background: #f1c40f; box-shadow: 0 0 5px #f1c40f; }
 .red { background: #e74c3c; box-shadow: 0 0 5px #e74c3c; }
+
+/* ---------------------------------------------------------
+   FEATURE 1: SENSOR DASHBOARD (CSS OVERLAY)
+   --------------------------------------------------------- */
+#dashboard-container {
+    position: absolute;
+    top: 100px; /* Distance from top */
+    right: 20px; /* Distance from right */
+    width: 350px;
+    height: 250px;
+    background: rgba(0, 0, 0, 0.75); /* Dark transparent background */
+    border: 1px solid #00ffff; /* Cyan border */
+    border-radius: 10px;
+    padding: 15px;
+    z-index: 10; /* Sit on top of 3D canvas */
+    pointer-events: none; /* Let clicks pass through to 3D */
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    font-family: 'Courier New', Courier, monospace;
+    color: white;
+}
+
+#dashboard-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #00ffff;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+    padding-bottom: 5px;
+}
+
+.dashboard-graph {
+    width: 100%;
+    height: 50px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-label {
+    font-size: 12px;
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.label-temp { color: #ff4444; }
+.label-press { color: #44ff44; }
+.label-vib { color: #4488ff; }
