@@ -11,6 +11,13 @@ let dashboardCanvas = null;
 let dashboardCtx = null;
 let dashboardTexture = null;
 
+// X-Ray Variables
+let isXRayMode = false;
+
+// Fault Localization Variables
+let faultRing = null;
+let showFaultMarkers = true;
+
 // Data history for graphs
 const historyLength = 50;
 const tempHistory = [];
@@ -347,7 +354,7 @@ const soundWarning = document.getElementById('soundWarning');
 const soundAlarm = document.getElementById('soundAlarm');
 const btnSound = document.getElementById('btnSound');
 let isMuted = true;
-function toggleSound() { try { isMuted = !isMuted; if (isMuted) { btnSound.innerText = "Sound: OFF"; stopAllAudio(); } else { btnSound.innerText = "Sound: ON"; const stateText = document.getElementById("stateText").innerText.split(": ")[1]; playSoundForState(stateText); } } catch (e) { console.log("Sound error", e); } }
+function toggleSound() { try { isMuted = !isMuted; if (isMuted) { btnSound.innerText = "Sound: OFF"; stopAllAudio(); } else { btnSound.innerText = "Sound: ON"; const stateText = document.getElementById("stateValue").innerText; playSoundForState(stateText); } } catch (e) { console.log("Sound error", e); } }
 function stopAllAudio() { try { if(soundEngine) soundEngine.pause(); if(soundWarning) soundWarning.pause(); if(soundAlarm) soundAlarm.pause(); } catch (e) {} }
 function playSoundForState(state) { if (isMuted) return; stopAllAudio(); try { if (state === "GOOD") { if(soundEngine) soundEngine.play(); } else if (state === "WARNING") { if(soundWarning) soundWarning.play(); } else if (state === "CRITICAL") { if(soundAlarm) soundAlarm.play(); } } catch (e) { console.log("Audio play failed", e); } }
 
@@ -404,8 +411,9 @@ loader.load("models/engine.glb", function(gltf) {
     if (turbine) { turbine.traverse((child) => { if (child.isMesh && !turbineMesh) turbineMesh = child; }); if (!turbineMesh && turbine.isMesh) turbineMesh = turbine; if (turbineMesh && turbineMesh.geometry) turbineGeometryAttr = turbineMesh.geometry.attributes.position; }
     if (details) { details.traverse((child) => { if (child.isMesh && !detailsMesh) detailsMesh = child; }); if (!detailsMesh && details.isMesh) detailsMesh = details; if (detailsMesh && detailsMesh.geometry) detailsGeometryAttr = detailsMesh.geometry.attributes.position; }
     if (fan) { fan.traverse((child) => { if (child.isMesh && !fanMesh) fanMesh = child; }); if (!fanMesh && fan.isMesh) fanMesh = fan; if (fanMesh && fanMesh.geometry) fanGeometryAttr = fanMesh.geometry.attributes.position; }
+    
     setupPostProcessing();
-    createSmokeSystem(); createFireSystem(); createSparkSystem(); createDashboard(); getPrediction();
+    createSmokeSystem(); createFireSystem(); createSparkSystem(); createDashboard(); createFaultIndicator(); getPrediction();
 });
 
 // ---------------------------------------------------------
@@ -415,22 +423,57 @@ async function getPrediction() {
     try {
         const res = await fetch("http://127.0.0.1:5000/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: 85, pressure: 30, vibration: 0.3 }) });
         const data = await res.json();
-        document.getElementById("stateText").innerText = "State: " + data.state;
-        document.getElementById("rulText").innerText = "RUL: " + data.Predicted_RUL.toFixed(2);
+        document.getElementById("rulValue").innerText = data.Predicted_RUL.toFixed(2);
         applyState(data.state);
-    } catch (err) { console.error("API Error:", err); document.getElementById("stateText").innerText = "State: Server Offline"; applyState("WARNING"); }
+    } catch (err) {
+        console.error("API Error:", err);
+        document.getElementById("stateValue").innerText = "OFFLINE";
+        document.getElementById("rulValue").innerText = "0.0";
+        applyState("CRITICAL");
+    }
 }
 function resetColors() { allMeshes.forEach(function(obj) { obj.material.emissive.set(0x000000); obj.material.emissiveIntensity = 0; obj.userData.colorType = "none"; }); }
 function setGroupColor(groupObj, colorHex, type) { if (!groupObj) return; if (groupObj.children && groupObj.children.length > 0) { groupObj.traverse((child) => { if (child.isMesh) { child.material.emissive.set(colorHex); child.userData.colorType = type; } }); } else if (groupObj.isMesh) { groupObj.material.emissive.set(colorHex); groupObj.userData.colorType = type; } }
+
 function applyState(state) {
     resetColors();
-    if (smokeParticles) smokeParticles.visible = false; if (fireParticles) fireParticles.visible = false; if (sparkParticles) sparkParticles.visible = false;
-    if (state === "GOOD") { rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 }; vibration = 0; } 
-    else if (state === "WARNING") { const yellowColor = 0xFFAA00; const yellowIntensity = 3.0; setGroupColor(compressor, yellowColor, "yellow"); fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; }); rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02; } 
-    else if (state === "CRITICAL") { const redColor = 0xFF0000; const redIntensity = 4.0; setGroupColor(turbine, redColor, "red"); fixedRandomParts.forEach(part => { part.material.emissive.set(redColor); part.material.emissiveIntensity = redIntensity; part.userData.colorType = "red"; }); if (smokeParticles) smokeParticles.visible = true; if (fireParticles) fireParticles.visible = true; if (sparkParticles) sparkParticles.visible = true; rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 }; vibration = 0.08; }
-    document.getElementById("stateText").innerText = "State: " + state;
+    if (smokeParticles) smokeParticles.visible = false; 
+    if (fireParticles) fireParticles.visible = false; 
+    if (sparkParticles) sparkParticles.visible = false;
+    if(faultRing) faultRing.visible = false;
+
+    const stateEl = document.getElementById("stateValue");
+    stateEl.classList.remove("status-good", "status-warning", "status-critical");
+
+    if (state === "GOOD") { 
+        rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 }; vibration = 0;
+        stateEl.innerText = "GOOD";
+        stateEl.classList.add("status-good");
+    } 
+    else if (state === "WARNING") { 
+        const yellowColor = 0xFFAA00; const yellowIntensity = 3.0; 
+        setGroupColor(compressor, yellowColor, "yellow"); 
+        fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; }); 
+        rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02;
+        stateEl.innerText = "WARNING";
+        stateEl.classList.add("status-warning");
+        updateFaultIndicator(compressor, "WARNING");
+    } 
+    else if (state === "CRITICAL") { 
+        const redColor = 0xFF0000; const redIntensity = 4.0; 
+        setGroupColor(turbine, redColor, "red"); 
+        fixedRandomParts.forEach(part => { part.material.emissive.set(redColor); part.material.emissiveIntensity = redIntensity; part.userData.colorType = "red"; }); 
+        if (smokeParticles) smokeParticles.visible = true; 
+        if (fireParticles) fireParticles.visible = true; 
+        if (sparkParticles) sparkParticles.visible = true; 
+        rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 }; vibration = 0.08;
+        stateEl.innerText = "CRITICAL";
+        stateEl.classList.add("status-critical");
+        updateFaultIndicator(turbine, "CRITICAL");
+    }
     playSoundForState(state);
 }
+
 let autoInterval = null;
 function startAutoTest() { if (autoInterval) clearInterval(autoInterval); const states = ["GOOD", "WARNING", "CRITICAL"]; let i = 0; autoInterval = setInterval(() => { applyState(states[i]); i = (i + 1) % states.length; }, 2000); }
 function showRealEngine() { if (autoInterval) clearInterval(autoInterval); resetColors(); setTimeout(() => { applyState("WARNING"); }, 3000); }
@@ -447,10 +490,15 @@ function animate() {
     if (compressor) compressor.rotation.x += rotationSpeed.compressor;
     if (turbine) turbine.rotation.x += rotationSpeed.turbine;
     const time = Date.now() * 0.002;
-    allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 3.0 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
+    allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 1.0 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
     updateSmoke(); updateFire(); updateSparks();
-    const currentState = document.getElementById("stateText").innerText.split(": ")[1];
+    const currentState = document.getElementById("stateValue").innerText;
     updateDashboard(currentState);
+    if(faultRing && faultRing.visible) {
+        faultRing.rotation.z += 0.05;
+        const scale = 1.0 + Math.sin(time * 5) * 0.1;
+        faultRing.scale.set(scale, scale, scale);
+    }
     if (dashboardMesh) dashboardMesh.lookAt(camera.position);
     if (model) { if (model.userData.baseY === undefined) model.userData.baseY = model.position.y; if (vibration > 0) { model.position.x = (Math.random() - 0.5) * vibration; model.position.y = model.userData.baseY + (Math.random() - 0.5) * vibration; } else { model.position.x = 0; model.position.y = model.userData.baseY; } }
     if (composer) composer.render(); else renderer.render(scene, camera);
@@ -475,13 +523,13 @@ function applyThermalColors() {
         else if (obj.userData.colorType === "yellow" || obj.name.toLowerCase().includes("compressor")) { heatColor = 0xFFAA00; obj.material.emissiveIntensity = 1.5; } 
         else if (obj.name.toLowerCase().includes("fan")) { heatColor = 0x00FFFF; obj.material.emissiveIntensity = 0.8; } 
         else { heatColor = 0x003366; obj.material.emissiveIntensity = 0.5; }
-        obj.material.emissive.setHex(heatColor);dashboardCtx.font
+        obj.material.emissive.setHex(heatColor);
     });
 }
-function restoreOriginalColors() { allMeshes.forEach(obj => { if (originalMaterials[obj.uuid]) { obj.material.emissive.setHex(originalMaterials[obj.uuid].emissive); obj.material.emissiveIntensity = originalMaterials[obj.uuid].intensity; } }); applyState(document.getElementById("stateText").innerText.split(": ")[1]); }
+function restoreOriginalColors() { allMeshes.forEach(obj => { if (originalMaterials[obj.uuid]) { obj.material.emissive.setHex(originalMaterials[obj.uuid].emissive); obj.material.emissiveIntensity = originalMaterials[obj.uuid].intensity; } }); applyState(document.getElementById("stateValue").innerText); }
 
 // ---------------------------------------------------------
-// FEATURE 1: GLASS DASHBOARD SYSTEM (FIXED CRITICAL OVERLAP)
+// FEATURE 1: DASHBOARD
 // ---------------------------------------------------------
 function createDashboard() {
     dashboardCanvas = document.createElement('canvas'); dashboardCanvas.width = 512; dashboardCanvas.height = 256;
@@ -492,60 +540,82 @@ function createDashboard() {
     dashboardMesh.position.set(-0.5, 6.4, 0.3);
     scene.add(dashboardMesh);
 }
-
 function updateDashboard(state) {
     if (!dashboardCtx) return;
     let baseTemp = 800, basePress = 20, baseVib = 0.1;
     if (state === "WARNING") { baseTemp = 950; baseVib = 0.4; } else if (state === "CRITICAL") { baseTemp = 1100; basePress = 28; baseVib = 0.8; }
     const newTemp = baseTemp + (Math.random() * 50 - 25), newPress = basePress + (Math.random() * 2 - 1), newVib = baseVib + (Math.random() * 0.05);
     tempHistory.push(newTemp); tempHistory.shift(); pressHistory.push(newPress); pressHistory.shift(); vibHistory.push(newVib); vibHistory.shift();
-
-    // 1. Clear and Draw Background
     dashboardCtx.clearRect(0, 0, 512, 256);
-    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.6)'; 
-    dashboardCtx.beginPath(); 
-    dashboardCtx.roundRect(10, 10, 492, 236, 10); 
-    dashboardCtx.fill();
-
-    // 2. Draw Border
+    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.6)'; dashboardCtx.beginPath(); dashboardCtx.roundRect(10, 10, 492, 236, 10); dashboardCtx.fill();
     dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.5)'; dashboardCtx.lineWidth = 2; dashboardCtx.stroke();
-
-    // 3. Draw Title
-    dashboardCtx.font = "bold 24px Arial"; dashboardCtx.fillStyle = "#00ffff"; dashboardCtx.shadowColor = '#00ffff'; dashboardCtx.shadowBlur = 10; 
-    dashboardCtx.fillText("SENSOR DATA", 20, 40); 
-    dashboardCtx.shadowBlur = 0; 
-
-    // 4. Draw Separator
+    dashboardCtx.font = "bold 24px Arial"; dashboardCtx.fillStyle = "#00ffff"; dashboardCtx.shadowColor = '#00ffff'; dashboardCtx.shadowBlur = 10; dashboardCtx.fillText("SENSOR DATA", 20, 40); dashboardCtx.shadowBlur = 0; 
     dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.3)'; dashboardCtx.beginPath(); dashboardCtx.moveTo(20, 50); dashboardCtx.lineTo(492, 50); dashboardCtx.stroke();
-
-    // 5. Draw Helper Function
-    // yBase is the bottom line of the graph. 
-    // Graph draws UPWARDS (y - height).
     function drawGraph(data, color, yMin, yMax, yBase) {
         dashboardCtx.strokeStyle = color; dashboardCtx.lineWidth = 2; dashboardCtx.shadowColor = color; dashboardCtx.shadowBlur = 5; dashboardCtx.beginPath();
         data.forEach((val, index) => { const x = 20 + (index / historyLength) * 470; const y = yBase - ((val - yMin) / (yMax - yMin)) * 40; if (index === 0) dashboardCtx.moveTo(x, y); else dashboardCtx.lineTo(x, y); });
         dashboardCtx.stroke(); dashboardCtx.shadowBlur = 0;
     }
-
-    // 6. Draw Data (Spaced perfectly)
-
-    // --- TEMP (Top Section) ---
-    // Text at 60. Graph Base at 105. Height 40px. Peaks at 65.
-    dashboardCtx.font = "14px Arial"; dashboardCtx.fillStyle = "#ff4444"; 
-    dashboardCtx.fillText("TEMP: " + Math.round(newTemp) + "°C", 20, 75);
+    dashboardCtx.font = "14px Arial";
+    dashboardCtx.fillStyle = "#ff4444"; dashboardCtx.fillText("TEMP: " + Math.round(newTemp) + "°C", 20, 75);
     drawGraph(tempHistory, '#ff4444', 700, 1200, 115);
-
-    // --- PRES (Middle Section) ---
-    // Text at 125. Graph Base at 170. Height 40px. Peaks at 130.
-    dashboardCtx.fillStyle = "#44ff44"; 
-    dashboardCtx.fillText("PRES: " + newPress.toFixed(1) + " psi", 20, 125);
+    dashboardCtx.fillStyle = "#44ff44"; dashboardCtx.fillText("PRES: " + newPress.toFixed(1) + " psi", 20, 125);
     drawGraph(pressHistory, '#44ff44', 10, 40, 170);
-
-    // --- VIB (Bottom Section) ---
-    // Text at 190. Graph Base at 235. Height 40px. Peaks at 195.
-    dashboardCtx.fillStyle = "#4488ff"; 
-    dashboardCtx.fillText("VIB: " + newVib.toFixed(2) + "g", 20, 190);
+    dashboardCtx.fillStyle = "#4488ff"; dashboardCtx.fillText("VIB: " + newVib.toFixed(2) + "g", 20, 190);
     drawGraph(vibHistory, '#4488ff', 0, 1.0, 235);
-
     dashboardTexture.needsUpdate = true;
+}
+
+// ---------------------------------------------------------
+// FEATURE 2: X-RAY VISION
+// ---------------------------------------------------------
+function toggleXRay() {
+    isXRayMode = !isXRayMode;
+    if (body) {
+        body.traverse((child) => {
+            if (child.isMesh) {
+                if (isXRayMode) {
+                    child.material.transparent = true;
+                    child.material.opacity = 0.15;
+                    child.material.side = THREE.DoubleSide;
+                } else {
+                    child.material.transparent = false;
+                    child.material.opacity = 1.0;
+                    child.material.side = THREE.FrontSide;
+                }
+            }
+        });
+    }
+}
+
+// ---------------------------------------------------------
+// FEATURE 3: FAULT LOCALIZATION
+// ---------------------------------------------------------
+function createFaultIndicator() {
+    const geometry = new THREE.TorusGeometry(0.8, 0.05, 16, 50);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+    faultRing = new THREE.Mesh(geometry, material);
+    faultRing.rotation.y = Math.PI / 2;
+    faultRing.visible = false;
+    scene.add(faultRing);
+}
+
+function toggleFaultMarkers() {
+    showFaultMarkers = !showFaultMarkers;
+    if(faultRing) faultRing.visible = showFaultMarkers && (document.getElementById("stateValue").innerText.includes("WARNING") || document.getElementById("stateValue").innerText.includes("CRITICAL"));
+}
+
+function updateFaultIndicator(targetPart, state) {
+    if (!faultRing || !showFaultMarkers) return;
+    if (targetPart) {
+        const pos = new THREE.Vector3();
+        targetPart.getWorldPosition(pos);
+        faultRing.position.copy(pos);
+        if (state === "WARNING") {
+            faultRing.material.color.setHex(0xFFAA00);
+        } else if (state === "CRITICAL") {
+            faultRing.material.color.setHex(0xFF0000);
+        }
+        faultRing.visible = true;
+    }
 }

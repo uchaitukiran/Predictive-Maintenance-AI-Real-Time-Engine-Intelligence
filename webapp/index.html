@@ -30,6 +30,8 @@
     <button onclick="startAutoTest()">Auto Test</button>
     <button id="btnSound" onclick="toggleSound()" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">Sound: OFF</button>
     <button onclick="toggleThermal()" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">Thermal Vision</button>
+    <button onclick="toggleXRay()" style="background: linear-gradient(135deg, #3498db, #2980b9);">X-Ray Vision</button>
+    <button onclick="toggleFaultMarkers()" style="background: linear-gradient(135deg, #e67e22, #d35400);">Toggle Fault Marker</button>
 
     <div class="slider-container">
         <label>Environment Rotation</label>
@@ -39,34 +41,23 @@
 
 <canvas id="scene"></canvas>
 
+<!-- STATUS BOX (Clean UI) -->
 <div class="status-box">
-    <h2>Engine Status</h2>
-    <p id="stateText">State: --</p>
-    <p id="rulText">RUL: --</p>
-</div>
-
-<!-- REMOVED: OLD HTML DASHBOARD (LIVE TELEMETRY) -->
-<!--
-<div id="dashboard-container">
-    <div id="dashboard-title">Live Telemetry</div>
+    <h2>Engine Health</h2>
     
-    <div class="dashboard-label label-temp">
-        <span>TEMP (°C)</span> <span id="val-temp">0</span>
+    <div class="status-row">
+        <span class="label">OPERATIONAL STATE :</span>
+        <span id="stateValue" class="value">STANDBY</span>
     </div>
-    <canvas id="graph-temp" class="dashboard-graph"></canvas>
-
-    <div class="dashboard-label label-press">
-        <span>PRESSURE (psi)</span> <span id="val-press">0</span>
+    
+    <div class="status-row">
+        <span class="label">Remaining Useful Life :</span>
+        <span id="rulValue" class="value-white">--</span>
+        <span class="unit">Cycles</span>
     </div>
-    <canvas id="graph-press" class="dashboard-graph"></canvas>
-
-    <div class="dashboard-label label-vib">
-        <span>VIBRATION (g)</span> <span id="val-vib">0</span>
-    </div>
-    <canvas id="graph-vib" class="dashboard-graph"></canvas>
 </div>
--->
 
+<!-- LEGEND -->
 <div class="legend">
     <h3>Health Legend</h3>
     <div class="legend-item"><span class="dot green"></span> GOOD</div>
