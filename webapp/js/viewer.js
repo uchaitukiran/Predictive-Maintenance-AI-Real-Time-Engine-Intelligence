@@ -423,12 +423,20 @@ async function getPrediction() {
     try {
         const res = await fetch("http://127.0.0.1:5000/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: 85, pressure: 30, vibration: 0.3 }) });
         const data = await res.json();
-        document.getElementById("rulValue").innerText = data.Predicted_RUL.toFixed(2);
+        
+        // Update UI Values
+        const rul = data.Predicted_RUL;
+        document.getElementById("rulVal").innerText = rul.toFixed(2);
+        const percent = Math.min(100, Math.max(0, rul));
+        document.getElementById("rulFill").style.width = percent + "%";
+        document.getElementById("rulPercent").innerText = Math.round(percent) + "%";
+        
         applyState(data.state);
     } catch (err) {
         console.error("API Error:", err);
         document.getElementById("stateValue").innerText = "OFFLINE";
-        document.getElementById("rulValue").innerText = "0.0";
+        document.getElementById("rulVal").innerText = "0.0";
+        document.getElementById("rulFill").style.width = "0%";
         applyState("CRITICAL");
     }
 }
@@ -442,21 +450,31 @@ function applyState(state) {
     if (sparkParticles) sparkParticles.visible = false;
     if(faultRing) faultRing.visible = false;
 
+    // Get UI Elements
+    const box = document.getElementById("statusBox");
     const stateEl = document.getElementById("stateValue");
-    stateEl.classList.remove("status-good", "status-warning", "status-critical");
+
+    // Remove old classes
+    box.classList.remove("status-good", "status-warning", "status-critical");
 
     if (state === "GOOD") { 
         rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 }; vibration = 0;
+        
+        // UI Updates
+        box.classList.add("status-good");
         stateEl.innerText = "GOOD";
-        stateEl.classList.add("status-good");
+
     } 
     else if (state === "WARNING") { 
         const yellowColor = 0xFFAA00; const yellowIntensity = 3.0; 
         setGroupColor(compressor, yellowColor, "yellow"); 
         fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; }); 
         rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02;
+        
+        // UI Updates
+        box.classList.add("status-warning");
         stateEl.innerText = "WARNING";
-        stateEl.classList.add("status-warning");
+
         updateFaultIndicator(compressor, "WARNING");
     } 
     else if (state === "CRITICAL") { 
@@ -467,10 +485,14 @@ function applyState(state) {
         if (fireParticles) fireParticles.visible = true; 
         if (sparkParticles) sparkParticles.visible = true; 
         rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 }; vibration = 0.08;
+        
+        // UI Updates
+        box.classList.add("status-critical");
         stateEl.innerText = "CRITICAL";
-        stateEl.classList.add("status-critical");
+
         updateFaultIndicator(turbine, "CRITICAL");
     }
+
     playSoundForState(state);
 }
 
@@ -490,7 +512,7 @@ function animate() {
     if (compressor) compressor.rotation.x += rotationSpeed.compressor;
     if (turbine) turbine.rotation.x += rotationSpeed.turbine;
     const time = Date.now() * 0.002;
-    allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 1.0 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
+    allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 1.5 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
     updateSmoke(); updateFire(); updateSparks();
     const currentState = document.getElementById("stateValue").innerText;
     updateDashboard(currentState);

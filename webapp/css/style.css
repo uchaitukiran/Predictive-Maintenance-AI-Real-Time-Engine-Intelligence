@@ -97,69 +97,197 @@ canvas {
     border-radius: 50%;
 }
 
-/* Status Box - Clean Design */
+/* ---------------------------------------------------------
+   STATUS BOX - GLASSMORPHISM (TRANSPARENT GLASS)
+   --------------------------------------------------------- */
 .status-box {
     position: absolute;
     top: 20px;
     right: 20px;
-    background: rgba(0, 0, 0, 0.75);
-    color: white;
-    padding: 20px;
-    border-radius: 8px;
+    width: 280px;
+    
+    /* 1. TRANSPARENT BACKGROUND */
+    background: rgba(10, 15, 25, 0.65); 
+    
+    /* 2. BLUR EFFECT (The "Glass" look) */
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    
+    /* 3. TECHNICAL GRID OVERLAY */
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    
+    border-radius: 4px; 
     z-index: 50;
+    color: white;
+    font-family: 'Consolas', 'Monaco', monospace;
+    overflow: hidden;
+    
+    /* Default Border */
     border: 1px solid rgba(255, 255, 255, 0.2);
-    min-width: 220px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: all 0.3s ease;
 }
 
-.status-box h2 {
-    margin: 0 0 15px 0;
-    font-size: 16px;
-    color: #ffffff;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    padding-bottom: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+/* --- DYNAMIC STATE STYLES (GLOW) --- */
+
+/* GOOD STATE */
+.status-good {
+    border-color: rgba(46, 204, 113, 0.8);
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.3), 
+                inset 0 0 20px rgba(46, 204, 113, 0.05);
 }
 
-.status-row {
-    margin-bottom: 10px;
+/* WARNING STATE */
+.status-warning {
+    border-color: rgba(241, 196, 15, 0.8);
+    box-shadow: 0 0 20px rgba(241, 196, 15, 0.4), 
+                inset 0 0 20px rgba(241, 196, 15, 0.05);
+    animation: pulse-glow-warning 2s infinite;
+}
+
+/* CRITICAL STATE */
+.status-critical {
+    border-color: rgba(231, 76, 60, 1);
+    box-shadow: 0 0 25px rgba(231, 76, 60, 0.5), 
+                inset 0 0 25px rgba(231, 76, 60, 0.1);
+    animation: pulse-glow-critical 1s infinite;
+}
+
+@keyframes pulse-glow-warning {
+    0% { box-shadow: 0 0 20px rgba(241, 196, 15, 0.4); }
+    50% { box-shadow: 0 0 35px rgba(241, 196, 15, 0.7); }
+    100% { box-shadow: 0 0 20px rgba(241, 196, 15, 0.4); }
+}
+
+@keyframes pulse-glow-critical {
+    0% { box-shadow: 0 0 25px rgba(231, 76, 60, 0.5); }
+    50% { box-shadow: 0 0 50px rgba(231, 76, 60, 0.8); }
+    100% { box-shadow: 0 0 25px rgba(231, 76, 60, 0.5); }
+}
+
+/* --- HEADER --- */
+.mc-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.4); /* Slight darkening for header */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.label {
+.mc-header h2 {
+    margin: 0;
     font-size: 12px;
-    color: #aaaaaa;
-    font-weight: 500;
+    color: #00ffff;
+    letter-spacing: 2px;
+    font-weight: 700;
 }
 
-.value {
-    font-size: 16px;
-    font-weight: 700;
+.live-indicator {
+    font-size: 10px;
+    color: #00ff00;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.blink-dot {
+    width: 8px; height: 8px;
+    background: #00ff00;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #00ff00;
+    animation: blink 1s infinite;
+}
+
+/* --- MAIN STATE DISPLAY --- */
+.mc-main {
+    padding: 30px 15px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mc-label {
+    display: block;
+    font-size: 10px;
+    color: #aaaaaa;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
     text-transform: uppercase;
-    text-shadow: 0 0 5px currentColor;
 }
 
-.value-white {
-    font-size: 18px;
-    font-weight: 700;
-    color: #ffffff;
+/* THE BIG TEXT */
+.mc-value {
+    font-size: 40px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    transition: color 0.3s, text-shadow 0.3s;
 }
 
-.unit {
+/* State Colors for Text */
+.status-good .mc-value { color: #2ecc71; text-shadow: 0 0 20px rgba(46, 204, 113, 0.8); }
+.status-warning .mc-value { color: #f1c40f; text-shadow: 0 0 25px rgba(241, 196, 15, 0.9); }
+.status-critical .mc-value { color: #e74c3c; text-shadow: 0 0 30px rgba(231, 76, 60, 1); }
+
+/* --- RUL SECTION --- */
+.mc-rul-section {
+    padding: 20px 15px;
+}
+
+.mc-rul-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #ccc;
+}
+
+/* Progress Bar */
+.mc-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.mc-bar-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+}
+
+/* Bar Colors */
+.status-good .mc-bar-fill { background: #2ecc71; }
+.status-warning .mc-bar-fill { background: #f1c40f; }
+.status-critical .mc-bar-fill { background: #e74c3c; }
+
+.mc-rul-value-row {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.mc-big-number {
+    font-size: 28px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.mc-unit {
     font-size: 12px;
-    color: #aaaaaa;
-    margin-left: 5px;
+    color: #aaa;
 }
 
-/* Dynamic Colors for Text */
-.status-good { color: #2ecc71; }
-.status-warning { color: #f1c40f; }
-.status-critical { color: #e74c3c; animation: blink 1s infinite; }
-
-@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+/* Client Helper Text */
+.mc-help {
+    margin: 5px 0 0 0;
+    font-size: 9px;
+    color: #666;
+    text-align: center;
+}
 
 /* Legend */
 .legend {

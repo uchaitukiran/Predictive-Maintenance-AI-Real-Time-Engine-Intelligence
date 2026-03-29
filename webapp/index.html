@@ -41,19 +41,38 @@
 
 <canvas id="scene"></canvas>
 
-<!-- STATUS BOX (Clean UI) -->
-<div class="status-box">
-    <h2>Engine Health</h2>
-    
-    <div class="status-row">
-        <span class="label">OPERATIONAL STATE :</span>
-        <span id="stateValue" class="value">STANDBY</span>
+<!-- GLASS STATUS BOX -->
+<div class="status-box" id="statusBox">
+    <div class="mc-header">
+        <h2>ENGINE HEALTH</h2>
+        <div class="live-indicator"><span class="blink-dot"></span> LIVE</div>
     </div>
-    
-    <div class="status-row">
-        <span class="label">Remaining Useful Life :</span>
-        <span id="rulValue" class="value-white">--</span>
-        <span class="unit">Cycles</span>
+
+    <div class="mc-main">
+        <div class="mc-state-info">
+            <span class="mc-label">OPERATIONAL STATE</span>
+            <span id="stateValue" class="mc-value">STANDBY</span>
+        </div>
+    </div>
+
+    <div class="mc-rul-section">
+        <div class="mc-rul-header">
+            <!-- TEXT CHANGED HERE -->
+            <span class="mc-label">Remaining Useful Life</span>
+            <span id="rulPercent" class="mc-percent">100%</span>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="mc-bar-bg">
+            <div id="rulFill" class="mc-bar-fill" style="width: 100%"></div>
+        </div>
+
+        <!-- Value -->
+        <div class="mc-rul-value-row">
+            <span id="rulVal" class="mc-big-number">--</span>
+            <span class="mc-unit">CYCLES</span>
+        </div>
+        <p class="mc-help">1 Cycle ≈ 1 Flight Hour</p>
     </div>
 </div>
 
