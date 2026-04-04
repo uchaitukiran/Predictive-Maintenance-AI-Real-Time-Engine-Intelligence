@@ -76,11 +76,17 @@ class ModelTrainer:
         train_df = pd.read_csv(train_path)
         test_df = pd.read_csv(test_path)
 
-        X_train = train_df.drop(columns=["RUL", "engine_id", "cycle"])
-        y_train = train_df["RUL"]
+                # Define target
+        target_column_name = "RUL"
 
-        X_test = test_df.drop(columns=["RUL", "engine_id", "cycle"])
-        y_test = test_df["RUL"]
+        # Check if columns exist before dropping (Safe Drop)
+        cols_to_drop = ["RUL"] # We only need to drop RUL now. ID/Cycle are already gone.
+        
+        X_train = train_df.drop(columns=cols_to_drop)
+        y_train = train_df[target_column_name]
+
+        X_test = test_df.drop(columns=cols_to_drop)
+        y_test = test_df[target_column_name]
 
         models = self.get_models()
 

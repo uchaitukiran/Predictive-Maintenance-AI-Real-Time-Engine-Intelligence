@@ -1,82 +1,156 @@
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import joblib
-import pandas as pd
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+from flask_restx import Api, Resource, fields
+import sys
 import os
 
-app = FastAPI(title="Engine Health Monitoring API")
-
-# ---------------------------------------------------------
-# ✅ ULTIMATE CORS FIX
-# ---------------------------------------------------------
-# This explicitly allows your frontend (localhost:8000) to talk to backend (5000)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for testing
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ---------------------------------------------------------
-# MODEL LOADING
-# ---------------------------------------------------------
-# Path logic: webapp/api -> webapp -> project_root
+# Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-MODEL_PATH = os.path.join(project_root, "artifacts", "best_GradientBoosting.pkl")
+project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+sys.path.insert(0, project_root)
 
-model = None
-print(f"Looking for model at: {MODEL_PATH}")
+# Import Database Components
+from src.database.db import SessionLocal
+from src.database.models import EngineSensorData, Prediction
+from src.pipeline.predict_pipeline import CustomData, PredictPipeline
 
-try:
-    if os.path.exists(MODEL_PATH):
-        model = joblib.load(MODEL_PATH)
-        print("✅ Model loaded successfully!")
-    else:
-        print("❌ CRITICAL: Model file not found.")
-except Exception as e:
-    print(f"❌ Error loading model: {e}")
+app = Flask(__name__, 
+            static_folder=os.path.join(project_root, "webapp"),
+            template_folder=os.path.join(project_root, "webapp"),
+            static_url_path='') 
+
+CORS(app)
+
+# API Setup
+api = Api(app, version='1.0', title='Engine Health Monitoring API',
+          description='MNC Level API for Predictive Maintenance',
+          doc='/docs')
+ns = api.namespace('', description='Operations')
 
 # ---------------------------------------------------------
-# ROUTES
+# GLOBAL SIMULATION COUNTER
 # ---------------------------------------------------------
-@app.get("/")
-def home():
-    return {"message": "API Running"}
+current_simulation_id = 0
 
-@app.post("/predict")
-def predict(data: dict):
+# ---------------------------------------------------------
+# Routes
+# ---------------------------------------------------------
+
+@app.route("/", methods=['GET'])
+def index():
+    return render_template("index.html")
+
+# NEW: Endpoint to Reset Simulation to Row 1
+@app.route("/reset", methods=['GET'])
+def reset_simulation():
+    global current_simulation_id
+    current_simulation_id = 0
+    return jsonify({'status': 'reset', 'message': 'Simulation restarted from Row 1'})
+
+@app.route("/get_real_data", methods=['GET'])
+def get_real_data():
+    global current_simulation_id
+    db = SessionLocal()
     try:
-        print("📥 Received data:", data)
+        # Increment ID
+        current_simulation_id += 1
         
-        if model is None:
-            print("⚠️ Model is None, returning dummy data.")
-            return {"Predicted_RUL": 99.9, "state": "WARNING"}
-
-        df = pd.DataFrame([data])
+        # Fetch row
+        row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
         
-        # Match model columns
-        if hasattr(model, 'feature_names_in_'):
-            df = df.reindex(columns=model.feature_names_in_, fill_value=0)
+        # If end of data, loop back to 1
+        if not row:
+            current_simulation_id = 1
+            row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
 
-        rul = float(model.predict(df)[0])
-        
-        if rul > 120: state = "GOOD"
-        elif rul > 60: state = "WARNING"
-        else: state = "CRITICAL"
+        if row:
+            return jsonify({
+                'id': row.id,
+                'op_setting_1': row.op_setting_1,
+                'op_setting_2': row.op_setting_2,
+                'op_setting_3': row.op_setting_3,
+                'sensor_2': row.sensor_2,
+                'sensor_3': row.sensor_3,
+                'sensor_4': row.sensor_4,
+                'sensor_7': row.sensor_7,
+                'sensor_8': row.sensor_8,
+                'sensor_9': row.sensor_9,
+                'sensor_11': row.sensor_11,
+                'sensor_12': row.sensor_12,
+                'sensor_13': row.sensor_13,
+                'sensor_14': row.sensor_14,
+                'sensor_15': row.sensor_15,
+                'sensor_17': row.sensor_17,
+                'sensor_20': row.sensor_20,
+                'sensor_21': row.sensor_21
+            })
+        else:
+            return jsonify({'error': 'Database is empty'})
+    finally:
+        db.close()
 
-        print(f"📤 Sending response -> RUL: {rul}, State: {state}")
-        
-        return {
-            "Predicted_RUL": rul,
-            "state": state
-        }
+@ns.route('/predict')
+class PredictResource(Resource):
+    def post(self):
+        db = SessionLocal()
+        try:
+            data = request.get_json()
+            
+            # Prepare Data
+            custom_data = CustomData(
+                op_setting_1=float(data.get('op_setting_1', 0)),
+                op_setting_2=float(data.get('op_setting_2', 0)),
+                op_setting_3=float(data.get('op_setting_3', 0)),
+                sensor_2=float(data.get('sensor_2', 0)),
+                sensor_3=float(data.get('sensor_3', 0)),
+                sensor_4=float(data.get('sensor_4', 0)),
+                sensor_7=float(data.get('sensor_7', 0)),
+                sensor_8=float(data.get('sensor_8', 0)),
+                sensor_9=float(data.get('sensor_9', 0)),
+                sensor_11=float(data.get('sensor_11', 0)),
+                sensor_12=float(data.get('sensor_12', 0)),
+                sensor_13=float(data.get('sensor_13', 0)),
+                sensor_14=float(data.get('sensor_14', 0)),
+                sensor_15=float(data.get('sensor_15', 0)),
+                sensor_17=float(data.get('sensor_17', 0)),
+                sensor_20=float(data.get('sensor_20', 0)),
+                sensor_21=float(data.get('sensor_21', 0))
+            )
+            
+            pred_df = custom_data.get_data_as_data_frame()
+            predict_pipeline = PredictPipeline()
+            results = predict_pipeline.predict(pred_df)
+            rul_value = float(results[0])
 
-    except Exception as e:
-        print(f"❌ Prediction Error: {e}")
-        return {"Predicted_RUL": 0, "state": "CRITICAL"}
+            # Determine State
+            if rul_value > 100:
+                state = "GOOD"
+            elif rul_value > 30:
+                state = "WARNING"
+            else:
+                state = "CRITICAL"
+
+            # Log to DB (Optional)
+            new_pred = Prediction(
+                state=state,
+                rul=rul_value,
+                temperature=data.get('sensor_2', 0),
+                pressure=data.get('sensor_7', 0),
+                vibration=data.get('sensor_4', 0)
+            )
+            db.add(new_pred)
+            db.commit()
+
+            return {
+                'Predicted_RUL': rul_value,
+                'state': state
+            }
+
+        except Exception as e:
+            print(f"❌ ERROR: {e}")
+            return {'error': str(e)}, 500
+        finally:
+            db.close()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=8000, debug=True)

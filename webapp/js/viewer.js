@@ -1,7 +1,8 @@
 // ---------------------------------------------------------
 // VARIABLES & SETTINGS
 // ---------------------------------------------------------
-// Thermal Mode Variables
+
+let lastPredictionTime = 0;
 let isThermalMode = false;
 let originalMaterials = {}; 
 
@@ -17,6 +18,9 @@ let isXRayMode = false;
 // Fault Localization Variables
 let faultRing = null;
 let showFaultMarkers = true;
+
+// Demo Mode Flag
+let isDemoMode = false;
 
 // Data history for graphs
 const historyLength = 50;
@@ -413,33 +417,79 @@ loader.load("models/engine.glb", function(gltf) {
     if (fan) { fan.traverse((child) => { if (child.isMesh && !fanMesh) fanMesh = child; }); if (!fanMesh && fan.isMesh) fanMesh = fan; if (fanMesh && fanMesh.geometry) fanGeometryAttr = fanMesh.geometry.attributes.position; }
     
     setupPostProcessing();
-    createSmokeSystem(); createFireSystem(); createSparkSystem(); createDashboard(); createFaultIndicator(); getPrediction();
+    createSmokeSystem(); createFireSystem(); createSparkSystem(); createDashboard(); createFaultIndicator(); 
+    // Initial call
+    getPrediction();
 });
+
+// ---------------------------------------------------------
+// CONSOLE HELPER (VISUAL LOG)
+// ---------------------------------------------------------
+function toggleVisualConsole() {
+    const consoleEl = document.getElementById("visual-console");
+    if (consoleEl) {
+        if (consoleEl.style.display === "none") {
+            consoleEl.style.display = "block";
+        } else {
+            consoleEl.style.display = "none";
+        }
+    }
+}
+
+// Override console.log to show on screen
+const originalLog = console.log;
+console.log = function(...args) {
+    originalLog.apply(console, args); // Keep showing in browser console
+    
+    const logContent = document.getElementById("log-content");
+    if (logContent) {
+        const msg = args.map(a => {
+            try { return JSON.stringify(a); } catch (e) { return String(a); }
+        }).join(' ');
+        const div = document.createElement('div');
+        div.innerText = "> " + msg;
+        logContent.appendChild(div);
+        logContent.scrollTop = logContent.scrollHeight; // Auto scroll
+    }
+};
 
 // ---------------------------------------------------------
 // API & LOGIC
 // ---------------------------------------------------------
 async function getPrediction() {
+    if (isDemoMode) return;
+
     try {
-        const res = await fetch("http://127.0.0.1:5000/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: 85, pressure: 30, vibration: 0.3 }) });
-        const data = await res.json();
+        const dataRes = await fetch("http://127.0.0.1:8000/get_real_data");
+        const sensorData = await dataRes.json();
+
+        const res = await fetch("http://127.0.0.1:8000/predict", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sensorData)
+        });
+        const prediction = await res.json();
         
-        // Update UI Values
-        const rul = data.Predicted_RUL;
+        console.log("Row ID:", sensorData.id, "RUL:", prediction.Predicted_RUL);
+
+        const rul = prediction.Predicted_RUL;
         document.getElementById("rulVal").innerText = rul.toFixed(2);
+        
         const percent = Math.min(100, Math.max(0, rul));
         document.getElementById("rulFill").style.width = percent + "%";
         document.getElementById("rulPercent").innerText = Math.round(percent) + "%";
         
-        applyState(data.state);
+        applyState(prediction.state);
+        updateDashboard(prediction.state, sensorData);
+
     } catch (err) {
         console.error("API Error:", err);
         document.getElementById("stateValue").innerText = "OFFLINE";
-        document.getElementById("rulVal").innerText = "0.0";
-        document.getElementById("rulFill").style.width = "0%";
         applyState("CRITICAL");
+        updateDashboard("CRITICAL", {});
     }
 }
+
 function resetColors() { allMeshes.forEach(function(obj) { obj.material.emissive.set(0x000000); obj.material.emissiveIntensity = 0; obj.userData.colorType = "none"; }); }
 function setGroupColor(groupObj, colorHex, type) { if (!groupObj) return; if (groupObj.children && groupObj.children.length > 0) { groupObj.traverse((child) => { if (child.isMesh) { child.material.emissive.set(colorHex); child.userData.colorType = type; } }); } else if (groupObj.isMesh) { groupObj.material.emissive.set(colorHex); groupObj.userData.colorType = type; } }
 
@@ -450,31 +500,23 @@ function applyState(state) {
     if (sparkParticles) sparkParticles.visible = false;
     if(faultRing) faultRing.visible = false;
 
-    // Get UI Elements
     const box = document.getElementById("statusBox");
     const stateEl = document.getElementById("stateValue");
 
-    // Remove old classes
     box.classList.remove("status-good", "status-warning", "status-critical");
 
     if (state === "GOOD") { 
         rotationSpeed = { fan: 0.1, compressor: 0.15, turbine: 0.2 }; vibration = 0;
-        
-        // UI Updates
         box.classList.add("status-good");
         stateEl.innerText = "GOOD";
-
     } 
     else if (state === "WARNING") { 
         const yellowColor = 0xFFAA00; const yellowIntensity = 3.0; 
         setGroupColor(compressor, yellowColor, "yellow"); 
         fixedRandomParts.forEach(part => { part.material.emissive.set(yellowColor); part.material.emissiveIntensity = yellowIntensity; part.userData.colorType = "yellow"; }); 
         rotationSpeed = { fan: 0.15, compressor: 0.2, turbine: 0.25 }; vibration = 0.02;
-        
-        // UI Updates
         box.classList.add("status-warning");
         stateEl.innerText = "WARNING";
-
         updateFaultIndicator(compressor, "WARNING");
     } 
     else if (state === "CRITICAL") { 
@@ -485,20 +527,74 @@ function applyState(state) {
         if (fireParticles) fireParticles.visible = true; 
         if (sparkParticles) sparkParticles.visible = true; 
         rotationSpeed = { fan: 0.3, compressor: 0.35, turbine: 0.45 }; vibration = 0.08;
-        
-        // UI Updates
         box.classList.add("status-critical");
         stateEl.innerText = "CRITICAL";
-
         updateFaultIndicator(turbine, "CRITICAL");
     }
 
     playSoundForState(state);
 }
 
-let autoInterval = null;
-function startAutoTest() { if (autoInterval) clearInterval(autoInterval); const states = ["GOOD", "WARNING", "CRITICAL"]; let i = 0; autoInterval = setInterval(() => { applyState(states[i]); i = (i + 1) % states.length; }, 2000); }
-function showRealEngine() { if (autoInterval) clearInterval(autoInterval); resetColors(); setTimeout(() => { applyState("WARNING"); }, 3000); }
+// ---------------------------------------------------------
+// BUTTON LOGIC (FIXED)
+// ---------------------------------------------------------
+let autoTestTimer = null;
+
+function startAutoTest() {
+    console.log("Starting Auto Test...");
+    isDemoMode = true;
+    if (autoTestTimer) clearTimeout(autoTestTimer);
+
+    // Sequence: GOOD (3s) -> WARNING (3s) -> CRITICAL (3s) -> Resume
+    applyState("GOOD");
+    updateDashboard("GOOD", { sensor_2: 600, sensor_7: 500, sensor_4: 1000 }); 
+
+    autoTestTimer = setTimeout(() => {
+        applyState("WARNING");
+        updateDashboard("WARNING", { sensor_2: 800, sensor_7: 550, sensor_4: 1200 });
+        
+        autoTestTimer = setTimeout(() => {
+            applyState("CRITICAL");
+            updateDashboard("CRITICAL", { sensor_2: 1000, sensor_7: 600, sensor_4: 1500 });
+
+            autoTestTimer = setTimeout(() => {
+                console.log("Auto Test Complete.");
+                isDemoMode = false;
+                getPrediction();
+            }, 3000);
+        }, 3000);
+    }, 3000);
+}
+
+// REAL ENGINE BUTTON: Shows clean model (Lookdev) for 5 seconds
+function showRealEngine() {
+    console.log("👁️ Activating Real Engine Lookdev...");
+    
+    // 1. Stop Demos and Auto Predictions
+    if (autoTestTimer) clearTimeout(autoTestTimer);
+    isDemoMode = true;
+
+    // 2. RESET COLORS (Show clean metal/geometry)
+    resetColors();
+    
+    // Stop particles
+    if (smokeParticles) smokeParticles.visible = false;
+    if (fireParticles) fireParticles.visible = false;
+    if (sparkParticles) sparkParticles.visible = false;
+    if (faultRing) faultRing.visible = false;
+
+    // Set text
+    const stateEl = document.getElementById("stateValue");
+    stateEl.innerText = "LOOKDEV";
+    document.getElementById("statusBox").classList.remove("status-good", "status-warning", "status-critical");
+
+    // 3. Wait 5 seconds to admire the model
+    setTimeout(() => {
+        console.log("✅ Lookdev Complete. Resuming Live Data.");
+        isDemoMode = false;
+        getPrediction(); // Resume live feed
+    }, 5000);
+}
 
 // ---------------------------------------------------------
 // ANIMATION LOOP
@@ -511,11 +607,17 @@ function animate() {
     if (fan) fan.rotation.x += rotationSpeed.fan;
     if (compressor) compressor.rotation.x += rotationSpeed.compressor;
     if (turbine) turbine.rotation.x += rotationSpeed.turbine;
+    
     const time = Date.now() * 0.002;
+    
+    if (!isDemoMode && time - lastPredictionTime > 2.0) {
+        getPrediction();
+        lastPredictionTime = time;
+    }
+    
     allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 1.5 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
     updateSmoke(); updateFire(); updateSparks();
-    const currentState = document.getElementById("stateValue").innerText;
-    updateDashboard(currentState);
+    
     if(faultRing && faultRing.visible) {
         faultRing.rotation.z += 0.05;
         const scale = 1.0 + Math.sin(time * 5) * 0.1;
@@ -525,7 +627,10 @@ function animate() {
     if (model) { if (model.userData.baseY === undefined) model.userData.baseY = model.position.y; if (vibration > 0) { model.position.x = (Math.random() - 0.5) * vibration; model.position.y = model.userData.baseY + (Math.random() - 0.5) * vibration; } else { model.position.x = 0; model.position.y = model.userData.baseY; } }
     if (composer) composer.render(); else renderer.render(scene, camera);
 }
-window.addEventListener("load", () => { document.getElementById("btnBody").onclick = () => { if(body) body.visible = !body.visible; }; document.getElementById("btnDetails").onclick = () => { if(details) details.visible = !details.visible; }; });
+window.addEventListener("load", () => { 
+    document.getElementById("btnBody").onclick = () => { if(body) body.visible = !body.visible; }; 
+    document.getElementById("btnDetails").onclick = () => { if(details) details.visible = !details.visible; }; 
+});
 window.addEventListener("resize", function() {
     const width = window.innerWidth; const height = window.innerHeight;
     camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height);
@@ -551,7 +656,7 @@ function applyThermalColors() {
 function restoreOriginalColors() { allMeshes.forEach(obj => { if (originalMaterials[obj.uuid]) { obj.material.emissive.setHex(originalMaterials[obj.uuid].emissive); obj.material.emissiveIntensity = originalMaterials[obj.uuid].intensity; } }); applyState(document.getElementById("stateValue").innerText); }
 
 // ---------------------------------------------------------
-// FEATURE 1: DASHBOARD
+// FEATURE 1: DASHBOARD (FIXED AUTO-SCALING)
 // ---------------------------------------------------------
 function createDashboard() {
     dashboardCanvas = document.createElement('canvas'); dashboardCanvas.width = 512; dashboardCanvas.height = 256;
@@ -562,29 +667,98 @@ function createDashboard() {
     dashboardMesh.position.set(-0.5, 6.4, 0.3);
     scene.add(dashboardMesh);
 }
-function updateDashboard(state) {
+
+function updateDashboard(state, sensorData) {
     if (!dashboardCtx) return;
-    let baseTemp = 800, basePress = 20, baseVib = 0.1;
-    if (state === "WARNING") { baseTemp = 950; baseVib = 0.4; } else if (state === "CRITICAL") { baseTemp = 1100; basePress = 28; baseVib = 0.8; }
-    const newTemp = baseTemp + (Math.random() * 50 - 25), newPress = basePress + (Math.random() * 2 - 1), newVib = baseVib + (Math.random() * 0.05);
-    tempHistory.push(newTemp); tempHistory.shift(); pressHistory.push(newPress); pressHistory.shift(); vibHistory.push(newVib); vibHistory.shift();
+
+    // 1. Get Data (Fallback to defaults if missing)
+    const newTemp = sensorData.sensor_2 || 600; 
+    const newPress = sensorData.sensor_7 || 550;
+    const newVib = sensorData.sensor_4 || 1200;
+
+    // 2. Update History Arrays
+    tempHistory.push(newTemp);
+    tempHistory.shift();
+    pressHistory.push(newPress);
+    pressHistory.shift();
+    vibHistory.push(newVib);
+    vibHistory.shift();
+
+    // 3. Draw Background
     dashboardCtx.clearRect(0, 0, 512, 256);
-    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.6)'; dashboardCtx.beginPath(); dashboardCtx.roundRect(10, 10, 492, 236, 10); dashboardCtx.fill();
-    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.5)'; dashboardCtx.lineWidth = 2; dashboardCtx.stroke();
-    dashboardCtx.font = "bold 24px Arial"; dashboardCtx.fillStyle = "#00ffff"; dashboardCtx.shadowColor = '#00ffff'; dashboardCtx.shadowBlur = 10; dashboardCtx.fillText("SENSOR DATA", 20, 40); dashboardCtx.shadowBlur = 0; 
-    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.3)'; dashboardCtx.beginPath(); dashboardCtx.moveTo(20, 50); dashboardCtx.lineTo(492, 50); dashboardCtx.stroke();
-    function drawGraph(data, color, yMin, yMax, yBase) {
-        dashboardCtx.strokeStyle = color; dashboardCtx.lineWidth = 2; dashboardCtx.shadowColor = color; dashboardCtx.shadowBlur = 5; dashboardCtx.beginPath();
-        data.forEach((val, index) => { const x = 20 + (index / historyLength) * 470; const y = yBase - ((val - yMin) / (yMax - yMin)) * 40; if (index === 0) dashboardCtx.moveTo(x, y); else dashboardCtx.lineTo(x, y); });
-        dashboardCtx.stroke(); dashboardCtx.shadowBlur = 0;
+    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.85)';
+    dashboardCtx.beginPath();
+    dashboardCtx.roundRect(10, 10, 492, 236, 10);
+    dashboardCtx.fill();
+    
+    // Border Color based on state
+    let borderColor = 'rgba(0, 255, 255, 0.5)';
+    if(state === "WARNING") borderColor = 'rgba(255, 170, 0, 0.8)';
+    if(state === "CRITICAL") borderColor = 'rgba(255, 0, 0, 0.8)';
+    
+    dashboardCtx.strokeStyle = borderColor;
+    dashboardCtx.lineWidth = 2;
+    dashboardCtx.stroke();
+
+    // Header
+    dashboardCtx.font = "bold 24px Arial";
+    dashboardCtx.fillStyle = "#00ffff";
+    dashboardCtx.shadowColor = '#00ffff';
+    dashboardCtx.shadowBlur = 10;
+    dashboardCtx.fillText("SENSOR DATA", 20, 40);
+    dashboardCtx.shadowBlur = 0;
+
+    // Divider
+    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+    dashboardCtx.beginPath();
+    dashboardCtx.moveTo(20, 50);
+    dashboardCtx.lineTo(492, 50);
+    dashboardCtx.stroke();
+
+    // 4. Improved Auto-Scaling Graph Function
+    function drawGraph(data, color, yBase) {
+        const minVal = Math.min(...data);
+        const maxVal = Math.max(...data);
+        // Add 10% padding to range so line doesn't touch top/bottom
+        let range = (maxVal - minVal) * 1.2; 
+        if (range < 1) range = 10; // Minimum range to avoid flat lines
+
+        dashboardCtx.strokeStyle = color;
+        dashboardCtx.lineWidth = 2;
+        dashboardCtx.shadowColor = color;
+        dashboardCtx.shadowBlur = 5;
+        dashboardCtx.beginPath();
+        
+        data.forEach((val, index) => {
+            const x = 20 + (index / historyLength) * 470;
+            // Center the graph vertically in its 40px slot
+            const y = yBase - ((val - minVal) / range) * 40 + 20;
+            
+            if (index === 0) dashboardCtx.moveTo(x, y);
+            else dashboardCtx.lineTo(x, y);
+        });
+        
+        dashboardCtx.stroke();
+        dashboardCtx.shadowBlur = 0;
     }
+
     dashboardCtx.font = "14px Arial";
-    dashboardCtx.fillStyle = "#ff4444"; dashboardCtx.fillText("TEMP: " + Math.round(newTemp) + "°C", 20, 75);
-    drawGraph(tempHistory, '#ff4444', 700, 1200, 115);
-    dashboardCtx.fillStyle = "#44ff44"; dashboardCtx.fillText("PRES: " + newPress.toFixed(1) + " psi", 20, 125);
-    drawGraph(pressHistory, '#44ff44', 10, 40, 170);
-    dashboardCtx.fillStyle = "#4488ff"; dashboardCtx.fillText("VIB: " + newVib.toFixed(2) + "g", 20, 190);
-    drawGraph(vibHistory, '#4488ff', 0, 1.0, 235);
+    
+    // Temperature (Red)
+    dashboardCtx.fillStyle = "#ff4444";
+    dashboardCtx.fillText("TEMP: " + Math.round(newTemp), 20, 75);
+    drawGraph(tempHistory, '#ff4444', 115);
+
+    // Pressure (Green)
+    dashboardCtx.fillStyle = "#44ff44";
+    dashboardCtx.fillText("PRES: " + Math.round(newPress), 20, 125);
+    drawGraph(pressHistory, '#44ff44', 170);
+
+    // Vibration (Blue)
+    dashboardCtx.fillStyle = "#4488ff";
+    dashboardCtx.fillText("VIB: " + Math.round(newVib), 20, 190);
+    drawGraph(vibHistory, '#4488ff', 235);
+
     dashboardTexture.needsUpdate = true;
 }
 

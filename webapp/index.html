@@ -32,6 +32,10 @@
     <button onclick="toggleThermal()" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">Thermal Vision</button>
     <button onclick="toggleXRay()" style="background: linear-gradient(135deg, #3498db, #2980b9);">X-Ray Vision</button>
     <button onclick="toggleFaultMarkers()" style="background: linear-gradient(135deg, #e67e22, #d35400);">Toggle Fault Marker</button>
+    <!-- 1. ADD THIS BUTTON inside your .control-panel div -->
+    <button onclick="toggleVisualConsole()" style="background: linear-gradient(135deg, #34495e, #2c3e50);">Toggle Console</button>
+
+
 
     <div class="slider-container">
         <label>Environment Rotation</label>
@@ -89,7 +93,16 @@
 <audio id="soundWarning" loop src="sounds/warning.mp3" preload="auto"></audio>
 <audio id="soundAlarm" loop src="sounds/alarm.mp3" preload="auto"></audio>
 
+
+
 <script src="js/viewer.js"></script>
+
+<!-- VISUAL CONSOLE -->
+<!-- 2. ADD THIS DIV at the very bottom, before </body> -->
+<div id="visual-console" style="display: none; position: fixed; bottom: 20px; left: 20px; width: 450px; height: 250px; background: rgba(0,0,0,0.95); border: 1px solid #00ffff; color: #00ff00; font-family: monospace; font-size: 13px; padding: 10px; overflow-y: auto; z-index: 9999; border-radius: 5px; box-shadow: 0 0 15px rgba(0,255,255,0.3);">
+    <div style="color: #00ffff; margin-bottom: 5px; border-bottom: 1px solid #00ffff; padding-bottom: 5px;">LIVE SYSTEM LOG:</div>
+    <div id="log-content"></div>
+</div>
 
 </body>
 </html>

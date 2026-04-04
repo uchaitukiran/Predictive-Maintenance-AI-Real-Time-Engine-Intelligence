@@ -1,13 +1,20 @@
+# Data Science & ML
 pandas
 numpy
 scikit-learn
 matplotlib
-seaborn
-xgboost
-lightgbm
-catboost
 joblib
+
+# Web Framework
+flask
+flask-cors
+
+# Database (MNC Level)
+sqlalchemy
+psycopg2-binary
+
+# Configuration
 python-dotenv
-fastapi
-uvicorn
-optuna
+
+# PostgreSQL
+psycopg2-binary
