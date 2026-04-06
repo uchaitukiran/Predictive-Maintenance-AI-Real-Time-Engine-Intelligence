@@ -610,9 +610,24 @@ function animate() {
     
     const time = Date.now() * 0.002;
     
+    // ---------------------------------------------------------
+    // LOGIC: FETCH DATA OR DEMO MODE
+    // ---------------------------------------------------------
     if (!isDemoMode && time - lastPredictionTime > 2.0) {
         getPrediction();
         lastPredictionTime = time;
+    } else if (isDemoMode) {
+        // FIX: If in Demo Mode, keep the dashboard moving!
+        // We create fake fluctuating data for the visual effect
+        const fakeData = {
+            sensor_2: 600 + Math.sin(time * 5) * 100, 
+            sensor_7: 550 + Math.cos(time * 5) * 50,
+            sensor_4: 1200 + Math.sin(time * 2) * 100
+        };
+        
+        // We pass the current state from the UI to keep colors consistent
+        const currentState = document.getElementById("stateValue").innerText;
+        updateDashboard(currentState, fakeData);
     }
     
     allMeshes.forEach((obj) => { if (obj.userData.colorType === "yellow") { const pulse = Math.sin(time + obj.position.x); obj.material.emissiveIntensity = 1.5 + pulse * 1.0; } else if (obj.userData.colorType === "red") { const wave = Math.sin(time * 2.0 - obj.position.x * 3.0); obj.material.emissiveIntensity = 4.0 + wave * 1.5; } });
@@ -671,12 +686,12 @@ function createDashboard() {
 function updateDashboard(state, sensorData) {
     if (!dashboardCtx) return;
 
-    // 1. Get Data (Fallback to defaults if missing)
+    // 1. Get Data
     const newTemp = sensorData.sensor_2 || 600; 
     const newPress = sensorData.sensor_7 || 550;
     const newVib = sensorData.sensor_4 || 1200;
 
-    // 2. Update History Arrays
+    // 2. Update History
     tempHistory.push(newTemp);
     tempHistory.shift();
     pressHistory.push(newPress);
@@ -684,84 +699,105 @@ function updateDashboard(state, sensorData) {
     vibHistory.push(newVib);
     vibHistory.shift();
 
-    // 3. Draw Background
+    // 3. Clear Canvas
     dashboardCtx.clearRect(0, 0, 512, 256);
-    dashboardCtx.fillStyle = 'rgba(0, 5, 15, 0.85)';
-    dashboardCtx.beginPath();
-    dashboardCtx.roundRect(10, 10, 492, 236, 10);
-    dashboardCtx.fill();
-    
-    // Border Color based on state
-    let borderColor = 'rgba(0, 255, 255, 0.5)';
-    if(state === "WARNING") borderColor = 'rgba(255, 170, 0, 0.8)';
-    if(state === "CRITICAL") borderColor = 'rgba(255, 0, 0, 0.8)';
-    
-    dashboardCtx.strokeStyle = borderColor;
-    dashboardCtx.lineWidth = 2;
-    dashboardCtx.stroke();
 
-    // Header
-    dashboardCtx.font = "bold 24px Arial";
-    dashboardCtx.fillStyle = "#00ffff";
-    dashboardCtx.shadowColor = '#00ffff';
-    dashboardCtx.shadowBlur = 10;
-    dashboardCtx.fillText("SENSOR DATA", 20, 40);
-    dashboardCtx.shadowBlur = 0;
+    // Animation Pulse
+    const pulse = (Math.sin(Date.now() / 200) + 1) / 2; 
 
-    // Divider
-    dashboardCtx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-    dashboardCtx.beginPath();
-    dashboardCtx.moveTo(20, 50);
-    dashboardCtx.lineTo(492, 50);
-    dashboardCtx.stroke();
+    // ---------------------------------------------------------
+    // DRAWING HELPER: FIXED RANGE GAUGE
+    // ---------------------------------------------------------
+    function drawGauge(x, y, radius, value, min, max, color, label) {
+        // 1. Calculate Angle based on Fixed Min/Max
+        const percent = (value - min) / (max - min);
+        // Clamp percent between 0 and 1 so needle doesn't go crazy
+        const clampedPercent = Math.max(0, Math.min(1, percent));
+        const angle = clampedPercent * Math.PI * 1.5; 
 
-    // 4. Improved Auto-Scaling Graph Function
-    function drawGraph(data, color, yBase) {
-        const minVal = Math.min(...data);
-        const maxVal = Math.max(...data);
-        // Add 10% padding to range so line doesn't touch top/bottom
-        let range = (maxVal - minVal) * 1.2; 
-        if (range < 1) range = 10; // Minimum range to avoid flat lines
-
-        dashboardCtx.strokeStyle = color;
-        dashboardCtx.lineWidth = 2;
-        dashboardCtx.shadowColor = color;
-        dashboardCtx.shadowBlur = 5;
+        // 2. Background Arc
         dashboardCtx.beginPath();
-        
-        data.forEach((val, index) => {
-            const x = 20 + (index / historyLength) * 470;
-            // Center the graph vertically in its 40px slot
-            const y = yBase - ((val - minVal) / range) * 40 + 20;
-            
-            if (index === 0) dashboardCtx.moveTo(x, y);
-            else dashboardCtx.lineTo(x, y);
-        });
-        
+        dashboardCtx.arc(x, y, radius, Math.PI * 0.75, Math.PI * 2.25, false);
+        dashboardCtx.lineWidth = 8;
+        dashboardCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        dashboardCtx.stroke();
+
+        // 3. Value Arc (Animated Glow)
+        dashboardCtx.beginPath();
+        dashboardCtx.arc(x, y, radius, Math.PI * 0.75, Math.PI * 0.75 + angle, false);
+        dashboardCtx.lineWidth = 8;
+        dashboardCtx.strokeStyle = color;
+        dashboardCtx.shadowColor = color;
+        dashboardCtx.shadowBlur = 10 + (pulse * 10);
         dashboardCtx.stroke();
         dashboardCtx.shadowBlur = 0;
+
+        // 4. Needle
+        const needleLength = radius - 15;
+        const needleAngle = Math.PI * 0.75 + angle;
+        const needleX = x + needleLength * Math.cos(needleAngle);
+        const needleY = y + needleLength * Math.sin(needleAngle);
+        
+        dashboardCtx.beginPath();
+        dashboardCtx.moveTo(x, y);
+        dashboardCtx.lineTo(needleX, needleY);
+        dashboardCtx.strokeStyle = '#ffffff';
+        dashboardCtx.lineWidth = 3;
+        dashboardCtx.stroke();
+
+        // 5. Center Circle
+        dashboardCtx.beginPath();
+        dashboardCtx.arc(x, y, 6, 0, Math.PI * 2, false);
+        dashboardCtx.fillStyle = '#ffffff';
+        dashboardCtx.fill();
+
+        // 6. Value Text
+        dashboardCtx.font = "bold 24px Arial";
+        dashboardCtx.fillStyle = "#ffffff";
+        dashboardCtx.textAlign = "center";
+        dashboardCtx.fillText(Math.round(value), x, y + 45);
+
+        // 7. Label
+        dashboardCtx.font = "bold 14px Arial";
+        dashboardCtx.fillStyle = color;
+        dashboardCtx.fillText(label, x, y + 65);
+        
+        dashboardCtx.textAlign = "left"; 
     }
 
-    dashboardCtx.font = "14px Arial";
+    // ---------------------------------------------------------
+    // RENDER BACKGROUND & GAUGES
+    // ---------------------------------------------------------
     
-    // Temperature (Red)
-    dashboardCtx.fillStyle = "#ff4444";
-    dashboardCtx.fillText("TEMP: " + Math.round(newTemp), 20, 75);
-    drawGraph(tempHistory, '#ff4444', 115);
+    // Background
+    dashboardCtx.fillStyle = 'rgba(10, 15, 30, 0.9)';
+    dashboardCtx.fillRect(0, 0, 512, 256);
 
-    // Pressure (Green)
-    dashboardCtx.fillStyle = "#44ff44";
-    dashboardCtx.fillText("PRES: " + Math.round(newPress), 20, 125);
-    drawGraph(pressHistory, '#44ff44', 170);
+    // Border
+    dashboardCtx.strokeStyle = `rgba(0, 255, 255, ${0.5 + pulse * 0.3})`;
+    dashboardCtx.lineWidth = 2;
+    dashboardCtx.strokeRect(5, 5, 502, 246);
 
-    // Vibration (Blue)
-    dashboardCtx.fillStyle = "#4488ff";
-    dashboardCtx.fillText("VIB: " + Math.round(newVib), 20, 190);
-    drawGraph(vibHistory, '#4488ff', 235);
+    // Title
+    dashboardCtx.font = "bold 20px Arial";
+    dashboardCtx.fillStyle = "#00ffff";
+    dashboardCtx.fillText("SENSOR DATA", 20, 35);
+
+    // ---------------------------------------------------------
+    // DRAW GAUGES WITH FIXED RANGES
+    // ---------------------------------------------------------
+    
+    // TEMP: Range 0 to 1200
+    drawGauge(90, 150, 55, newTemp, 0, 1200, '#ff4444', "TEMP");
+
+    // PRES: Range 0 to 1000
+    drawGauge(256, 150, 55, newPress, 0, 1000, '#44ff44', "PRES");
+
+    // VIB: Range 0 to 2000
+    drawGauge(422, 150, 55, newVib, 0, 2000, '#4488ff', "VIB");
 
     dashboardTexture.needsUpdate = true;
 }
-
 // ---------------------------------------------------------
 // FEATURE 2: X-RAY VISION
 // ---------------------------------------------------------
