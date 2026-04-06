@@ -18,3 +18,5 @@ python-dotenv
 
 # PostgreSQL
 psycopg2-binary
+
+dill
