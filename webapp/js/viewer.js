@@ -481,6 +481,11 @@ async function getPrediction() {
         
         applyState(prediction.state);
         updateDashboard(prediction.state, sensorData);
+        
+        // ---------------------------------------------------------
+        // NEW: CALL LSTM DEEP LEARNING MODEL
+        // ---------------------------------------------------------
+        getLSTMPrediction(sensorData);
 
     } catch (err) {
         console.error("API Error:", err);
@@ -892,5 +897,28 @@ async function getNLPAnalysis(state) {
     } catch (err) {
         console.error("❌ NLP Error:", err);
         updateLog("Error: Could not connect to AI", "#ff4444");
+    }
+}
+
+// ---------------------------------------------------------
+// LSTM DEEP LEARNING PREDICTION
+// ---------------------------------------------------------
+async function getLSTMPrediction(sensorData) {
+    try {
+        const res = await fetch("http://127.0.0.1:8000/predict_lstm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sensorData)
+        });
+        const data = await res.json();
+
+        // Update HTML Elements
+        document.getElementById("lstmRUL").innerText = data.prediction.toFixed(1);
+        document.getElementById("lstmState").innerText = data.status;
+        document.getElementById("lstmMsg").innerText = data.message;
+
+    } catch (err) {
+        console.error("LSTM Error:", err);
+        document.getElementById("lstmMsg").innerText = "Connection Error";
     }
 }
