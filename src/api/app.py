@@ -152,5 +152,52 @@ class PredictResource(Resource):
         finally:
             db.close()
 
+import joblib
+import re
+
+# Load NLP Model once at startup
+NLP_MODEL_PATH = os.path.join(project_root, "artifacts", "nlp_log_classifier.pkl")
+nlp_model = None
+try:
+    nlp_model = joblib.load(NLP_MODEL_PATH)
+    print("✅ NLP Model Loaded Successfully.")
+except Exception as e:
+    print(f"⚠️ Could not load NLP Model: {e}")
+
+def clean_text_nlp(text):
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    return text
+
+# --- NEW ENDPOINT: Analyze Log Message ---
+@app.route("/analyze_log", methods=["POST"])
+def analyze_log():
+    if not nlp_model:
+        return jsonify({"error": "NLP Model not loaded"}), 500
+    
+    data = request.get_json()
+    log_message = data.get("log_message", "")
+    
+    if not log_message:
+        # Generate a default log based on state if not provided
+        state = data.get("state", "NORMAL")
+        
+        # UPDATED TO MATCH 3D VISUALIZATION
+        if state == "WARNING": 
+            log_message = "High vibration detected in compressor section." # Matches Yellow Compressor
+        elif state == "CRITICAL": 
+            log_message = "Critical failure detected in turbine blades!" # Matches Red Turbine
+        else: 
+            log_message = "All systems operational."
+
+    # Clean and Predict
+    clean_msg = clean_text_nlp(log_message)
+    prediction = nlp_model.predict([clean_msg])[0]
+    
+    return jsonify({
+        "log_message": log_message,
+        "predicted_status": prediction
+    })
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

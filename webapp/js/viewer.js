@@ -533,6 +533,7 @@ function applyState(state) {
     }
 
     playSoundForState(state);
+    getNLPAnalysis(state); // <--- ADD THIS LINE
 }
 
 // ---------------------------------------------------------
@@ -849,5 +850,47 @@ function updateFaultIndicator(targetPart, state) {
             faultRing.material.color.setHex(0xFF0000);
         }
         faultRing.visible = true;
+    }
+}
+
+// ---------------------------------------------------------
+// NLP LOG ANALYZER
+// ---------------------------------------------------------
+async function getNLPAnalysis(state) {
+    const logText = document.getElementById("nlp-log-text");
+    
+    // Helper to update text
+    const updateLog = (msg, color) => {
+        if (logText) {
+            logText.innerText = "> " + msg;
+            logText.style.color = color;
+        }
+    };
+
+    try {
+        // 1. Call the API
+        const res = await fetch("http://127.0.0.1:8000/analyze_log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: state })
+        });
+
+        // 2. Check if server responded OK
+        if (!res.ok) {
+            throw new Error(`Server Error: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // 3. Update UI
+        let color = "#00ffff"; // Cyan
+        if (data.predicted_status === "CRITICAL") color = "#ff4444"; // Red
+        if (data.predicted_status === "WARNING") color = "#ffaa00"; // Orange
+
+        updateLog(data.log_message, color);
+
+    } catch (err) {
+        console.error("❌ NLP Error:", err);
+        updateLog("Error: Could not connect to AI", "#ff4444");
     }
 }
