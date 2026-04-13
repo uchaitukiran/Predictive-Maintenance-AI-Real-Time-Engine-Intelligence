@@ -1,71 +1,94 @@
 import sys
 import os
 import pandas as pd
+from tqdm import tqdm
 
-# Add root to path
+# Setup Path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
-from src.database.db import SessionLocal, engine
+from src.database.db import SessionLocal
 from src.database.models import EngineSensorData
 
-def ingest_csv_to_db():
-    print("⚙️ Starting Data Ingestion...")
-    
-    # 1. Locate CSV
-    csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-                            "data", "processed", "train_engineered.csv")
-    
-    if not os.path.exists(csv_path):
-        print(f"❌ CSV not found at {csv_path}")
-        return
+# Mapping CSV Names -> DB Names
+# The CSV uses NASA names (s2, s3). The DB uses full names (sensor_2).
+COLUMN_MAP = {
+    's2': 'sensor_2',
+    's3': 'sensor_3',
+    's4': 'sensor_4',
+    's7': 'sensor_7',
+    's8': 'sensor_8',
+    's9': 'sensor_9',
+    's11': 'sensor_11',
+    's12': 'sensor_12',
+    's13': 'sensor_13',
+    's14': 'sensor_14',
+    's15': 'sensor_15',
+    's17': 'sensor_17',
+    's20': 'sensor_20',
+    's21': 'sensor_21',
+    'setting1': 'op_setting_1',
+    'setting2': 'op_setting_2',
+    'setting3': 'op_setting_3',
+    'op_setting_1': 'op_setting_1', # Handle if already correct name
+    'op_setting_2': 'op_setting_2',
+    'op_setting_3': 'op_setting_3',
+    'sensor_2': 'sensor_2' # Handle if already correct name
+}
 
+def ingest_data():
+    db = SessionLocal()
+    csv_path = 'data/processed/train_engineered.csv'
+    
+    print(f"⚙️ Reading {csv_path}...")
     df = pd.read_csv(csv_path)
     
-    # 2. Open DB Session
-    db = SessionLocal()
+    # Rename columns based on map
+    df.rename(columns=COLUMN_MAP, inplace=True)
     
-    try:
-        # Check if data already exists
-        if db.query(EngineSensorData).count() > 0:
-            print("✅ Database already populated. Skipping.")
-            return
+    print(f"📊 Found {len(df)} rows.")
 
-        # 3. Insert Data Row by Row
-        # We use a slice df.head(1000) to keep the DB small for demo, or remove slice for full data
-        data_to_insert = []
+    # Clear old data
+    db.query(EngineSensorData).delete()
+    db.commit()
+
+    print("🚀 Ingesting data into PostgreSQL...")
+    
+    # Use chunking for speed
+    CHUNK_SIZE = 1000
+    for i in tqdm(range(0, len(df), CHUNK_SIZE)):
+        chunk = df.iloc[i:i + CHUNK_SIZE]
+        records = []
         
-        for _, row in df.iterrows():
+        for _, row in chunk.iterrows():
+            # Safe Get with 0 default
+            def get_val(col_name):
+                return row.get(col_name, 0)
+
             record = EngineSensorData(
-                cycle=row.get('cycle', 0),
-                op_setting_1=row.get('op_setting_1', 0),
-                op_setting_2=row.get('op_setting_2', 0),
-                op_setting_3=row.get('op_setting_3', 0),
-                sensor_2=row.get('sensor_2', 0),
-                sensor_3=row.get('sensor_3', 0),
-                sensor_4=row.get('sensor_4', 0),
-                sensor_7=row.get('sensor_7', 0),
-                sensor_8=row.get('sensor_8', 0),
-                sensor_9=row.get('sensor_9', 0),
-                sensor_11=row.get('sensor_11', 0),
-                sensor_12=row.get('sensor_12', 0),
-                sensor_13=row.get('sensor_13', 0),
-                sensor_14=row.get('sensor_14', 0),
-                sensor_15=row.get('sensor_15', 0),
-                sensor_17=row.get('sensor_17', 0),
-                sensor_20=row.get('sensor_20', 0),
-                sensor_21=row.get('sensor_21', 0)
+                op_setting_1=get_val('op_setting_1'),
+                op_setting_2=get_val('op_setting_2'),
+                op_setting_3=get_val('op_setting_3'),
+                sensor_2=get_val('sensor_2'),
+                sensor_3=get_val('sensor_3'),
+                sensor_4=get_val('sensor_4'),
+                sensor_7=get_val('sensor_7'),
+                sensor_8=get_val('sensor_8'),
+                sensor_9=get_val('sensor_9'),
+                sensor_11=get_val('sensor_11'),
+                sensor_12=get_val('sensor_12'),
+                sensor_13=get_val('sensor_13'),
+                sensor_14=get_val('sensor_14'),
+                sensor_15=get_val('sensor_15'),
+                sensor_17=get_val('sensor_17'),
+                sensor_20=get_val('sensor_20'),
+                sensor_21=get_val('sensor_21')
             )
-            data_to_insert.append(record)
+            records.append(record)
         
-        db.bulk_save_objects(data_to_insert)
+        db.bulk_save_objects(records)
         db.commit()
-        print(f"✅ SUCCESS: Inserted {len(data_to_insert)} rows into Database.")
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        db.rollback()
-    finally:
-        db.close()
+
+    db.close()
+    print("✅ Ingestion Complete.")
 
 if __name__ == "__main__":
-    ingest_csv_to_db()
+    ingest_data()

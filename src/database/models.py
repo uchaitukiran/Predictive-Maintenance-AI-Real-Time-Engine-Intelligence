@@ -1,20 +1,15 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
-from sqlalchemy.sql import func
-from .db import Base
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy.orm import declarative_base
+from datetime import datetime
 
-# TABLE 1: Stores the Live Sensor Data (Inputs)
+Base = declarative_base()
+
 class EngineSensorData(Base):
-    __tablename__ = "engine_sensor_data"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    cycle = Column(Integer, index=True)
-    
-    # Operational Settings
+    __tablename__ = 'engine_sensor_data'
+    id = Column(Integer, primary_key=True, autoincrement=True)
     op_setting_1 = Column(Float)
     op_setting_2 = Column(Float)
     op_setting_3 = Column(Float)
-    
-    # Sensors (Add all sensors your model needs)
     sensor_2 = Column(Float)
     sensor_3 = Column(Float)
     sensor_4 = Column(Float)
@@ -29,16 +24,23 @@ class EngineSensorData(Base):
     sensor_17 = Column(Float)
     sensor_20 = Column(Float)
     sensor_21 = Column(Float)
-    
-    is_processed = Column(Boolean, default=False) # To track simulation progress
 
-# TABLE 2: Stores the Model Predictions (Outputs)
 class Prediction(Base):
-    __tablename__ = "predictions"
-    id = Column(Integer, primary_key=True, index=True)
-    state = Column(String)
+    __tablename__ = 'predictions'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    state = Column(String(50))
     rul = Column(Float)
-    temperature = Column(Float) # You can map sensor_2 here if needed
+    temperature = Column(Float)
     pressure = Column(Float)
     vibration = Column(Float)
-    timestamp = Column(DateTime, server_default=func.now())
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+class MaintenanceReport(Base):
+    __tablename__ = 'maintenance_reports'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    engine_state = Column(String(50))
+    rul = Column(Float)
+    report_text = Column(Text)
+    sensor_summary = Column(String(255))
+    is_deleted = Column(Integer, default=0)

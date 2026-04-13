@@ -922,3 +922,98 @@ async function getLSTMPrediction(sensorData) {
         document.getElementById("lstmMsg").innerText = "Connection Error";
     }
 }
+
+function downloadReport() {
+    window.location.href = "http://127.0.0.1:8000/generate_report";
+}
+
+
+let currentReportId = null;
+
+
+// 1. Generate Report
+async function generateReport() {
+    try {
+        const res = await fetch("http://127.0.0.1:8000/generate_report", { method: "POST" });
+        const result = await res.json();
+
+        if (result.status === "success") {
+            currentReportId = result.report_id;
+            document.getElementById("report-content").innerText = result.text;
+            document.getElementById("report-modal").style.display = "block";
+        } else {
+            alert("Error: " + result.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Failed to generate report.");
+    }
+}
+
+// 2. Close Modal
+function closeReportModal() {
+    document.getElementById("report-modal").style.display = "none";
+}
+
+// 3. Download
+function downloadCurrentReport() {
+    if (currentReportId) {
+        window.open(`http://127.0.0.1:8000/download_report/${currentReportId}`, '_blank');
+    }
+}
+
+// 4. Show History (Refined)
+async function showHistory() {
+    const res = await fetch("http://127.0.0.1:8000/report_history");
+    const history = await res.json();
+    
+    const list = document.getElementById("history-list");
+    list.innerHTML = "";
+    
+    if(history.length === 0) {
+        list.innerHTML = "<div style='color:#888; padding:10px;'>No history found.</div>";
+    }
+
+    history.forEach(item => {
+        const div = document.createElement("div");
+        div.style.borderBottom = "1px solid #333";
+        div.style.padding = "10px";
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+        
+        div.innerHTML = `
+            <div onclick="viewReport(${item.id})" style="cursor:pointer; flex:1;">
+                <div style="color:#00ffff">#${item.id} - ${item.state}</div>
+                <div style="font-size:12px; color:#888">${item.time}</div>
+            </div>
+            <button onclick="deleteReport(${item.id})" style="background:transparent; border:1px solid #ff4444; color:#ff4444; font-size:10px; padding:2px 5px; cursor:pointer;">DEL</button>
+        `;
+        
+        list.appendChild(div);
+    });
+    
+    document.getElementById("history-panel").style.display = "block";
+}
+
+function closeHistory() {
+    document.getElementById("history-panel").style.display = "none";
+}
+
+// 5. View Report (Loads text into modal)
+async function viewReport(id) {
+    currentReportId = id;
+    const res = await fetch(`http://127.0.0.1:8000/view_report/${id}`);
+    const data = await res.json();
+    
+    document.getElementById("report-content").innerText = data.text;
+    document.getElementById("report-modal").style.display = "block";
+}
+
+// 6. Delete Report
+async function deleteReport(id) {
+    if(confirm("Are you sure you want to delete this report?")) {
+        await fetch(`http://127.0.0.1:8000/delete_report/${id}`, { method: "POST" });
+        showHistory(); // Refresh list
+    }
+}
