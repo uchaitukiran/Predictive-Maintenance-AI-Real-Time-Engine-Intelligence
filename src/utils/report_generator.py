@@ -38,9 +38,12 @@ def generate_maintenance_report(data):
             "vib": f"{data.get('vibration', 0):.2f}"
         })
         
-        # Construct Final Text (Injecting Correct Values Manually)
+        # Construct Final Text (Injecting Correct Values + Timestamp)
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         final_report = f"""
 **SENSOR DATA SNAPSHOT**
+- Time: {current_time}
 - State: {data.get('state')}
 - RUL: {data.get('rul'):.2f} Cycles
 - Temperature: {data.get('temperature'):.2f}

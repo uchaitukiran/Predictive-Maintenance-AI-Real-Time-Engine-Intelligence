@@ -24,4 +24,8 @@ dill
 # DL
 tensorflow==2.15.0
 
-pip install langchain-groq langchain-core python-dotenv fpdf
+langchain-groq
+langchain-core
+tensorflow
+fpdf
+python-dotenv
