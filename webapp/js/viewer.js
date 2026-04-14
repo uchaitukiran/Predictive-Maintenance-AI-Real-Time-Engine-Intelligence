@@ -1017,3 +1017,54 @@ async function deleteReport(id) {
         showHistory(); // Refresh list
     }
 }
+
+function openAbout() {
+    document.getElementById("about-panel").style.display = "block";
+}
+
+function closeAbout() {
+    document.getElementById("about-panel").style.display = "none";
+}
+
+// PowerBI Image Viewer Logic
+// PowerBI Image Viewer Logic
+let panzoomInstance = null;
+
+function openPowerBI() {
+    const panel = document.getElementById("powerbi-panel");
+    const img = document.getElementById("bi-report-img");
+    
+    panel.style.display = "flex"; 
+
+    // Initialize Panzoom
+    if (!panzoomInstance) {
+        panzoomInstance = panzoom(img, {
+            maxZoom: 5.0,
+            minZoom: 0.5,
+            contain: 'outside',
+            startScale: 1.0
+        });
+    }
+    
+    // Reset to center
+    resetBI();
+}
+
+function closePowerBI() {
+    document.getElementById("powerbi-panel").style.display = "none";
+}
+
+function zoomInBI() {
+    if (panzoomInstance) panzoomInstance.zoomIn();
+}
+
+function zoomOutBI() {
+    if (panzoomInstance) panzoomInstance.zoomOut();
+}
+
+function resetBI() {
+    if (panzoomInstance) {
+        panzoomInstance.zoomAbs(0, 0, 1); // Reset Zoom
+        panzoomInstance.moveTo(0, 0);      // Reset Position
+    }
+}

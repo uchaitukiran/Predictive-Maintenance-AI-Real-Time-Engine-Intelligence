@@ -19,6 +19,8 @@
     <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
     <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
     <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <!-- Panzoom Library for Zoom/Pan images -->
+   <script src="https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js"></script>
 </head>
 <body>
 
@@ -38,11 +40,14 @@
     <button onclick="showHistory()" style="background: linear-gradient(135deg, #2980b9, #2c3e50);">VIEW HISTORY</button>
 
     <button onclick="toggleVisualConsole()" style="background: linear-gradient(135deg, #34495e, #2c3e50);">Toggle Console</button>
+    <button onclick="openPowerBI()" style="background: linear-gradient(135deg, #f1c40f, #f39c12); color:black; font-weight:bold;">POWER BI REPORT</button>
     
     <div class="slider-container">
         <label>Environment Rotation</label>
         <input type="range" id="rotationSlider" min="0" max="360" value="0">
     </div>
+    
+
 </div>
 
 <canvas id="scene"></canvas>
@@ -159,6 +164,113 @@
     <button onclick="closeHistory()" style="margin-top:20px; width:100%; background:#333; border:1px solid #00ffff; color:white; padding:5px; cursor:pointer;">Close</button>
 </div>
 
+<!-- FOOTER BAR (BOTTOM) -->
+<div style="position:fixed; bottom:15px; left:50%; transform:translateX(-50%); width:600px; height:60px; background:rgba(10, 15, 30, 0.90); border:1px solid #00ffff; border-radius:30px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; z-index:100; box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);">
+
+    <!-- LEFT SIDE: PHOTO -->
+    <div onclick="openAbout()" style="cursor:pointer; display:flex; align-items:center;">
+        <div style="width:45px; height:45px; border-radius:50%; border:2px solid #00ffff; overflow:hidden; background:#222; box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);">
+            <img src="img/developer_photo.jpg" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="margin-left:10px; color:#00ffff; font-size:12px; font-weight:bold;">DEVELOPER</div>
+    </div>
+
+    <!-- RIGHT SIDE: COPYRIGHT -->
+    <div style="text-align:right; color:#fff; font-family:Arial; font-size:12px; line-height:1.4;">
+        <span style="color:#00ffff; font-weight:bold;">© 2026 Urukonda Chaitanya Kiran</span><br>
+        <span style="color:#888; font-size:10px;">All Rights Reserved.</span>
+    </div>
+
+</div>
+<!-- ABOUT DEVELOPER POPUP (FINAL VERSION) -->
+<div id="about-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:700px; max-height:90vh; overflow-y:auto; background:rgba(10, 15, 30, 0.98); border:1px solid #00ffff; border-radius:15px; z-index:9999; padding:40px; color:white; font-family:Arial, sans-serif; box-shadow: 0 0 40px rgba(0, 255, 255, 0.4);">
+
+    <!-- Close Button -->
+    <div style="text-align:right; margin-top:-15px; margin-right:-15px;">
+        <button onclick="closeAbout()" style="background:transparent; border:1px solid #555; color:#888; cursor:pointer; font-size:20px; font-weight:bold; padding: 5px 10px; border-radius: 5px;">&times;</button>
+    </div>
+
+    <!-- Photo -->
+    <div style="width:140px; height:140px; border-radius:50%; border:3px solid #00ffff; margin:0 auto 25px auto; overflow:hidden; box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);">
+        <!-- Path: webapp/img/developer_photo.jpg -->
+        <img src="img/developer_photo.jpg" style="width:100%; height:100%; object-fit:cover;">
+    </div>
+
+    <!-- Header -->
+    <h2 style="color:#fff; margin:0 0 10px 0; font-size:26px; font-weight:bold; letter-spacing: 0.5px;">Urukonda Chaitanya Kiran</h2>
+    <div style="color:#00ffff; font-size:16px; margin-bottom:30px; text-transform: uppercase; letter-spacing: 2px; font-weight: bold;">Bridging Two Worlds: 3D Visualization & AI</div>
+
+    <!-- Main Story Text -->
+    <div style="font-size:14px; line-height:1.8; color:#ccc; text-align:left; margin-bottom:30px;">
+        
+        <p>For <b>10 years</b>, I was a <b>Lighting TD</b> in the VFX industry. I knew how to make things look real. But I wanted to make things <i>smart</i>.</p>
+        
+        <p>Data Science has a 'Visualization Gap'—insights are powerful but often trapped in charts. I built this project to bridge that gap.</p>
+
+        <div style="background:rgba(0, 255, 255, 0.05); border-left: 3px solid #00ffff; padding: 15px; margin: 20px 0;">
+            <b style="color:#fff; display:block; margin-bottom:10px; font-size:15px;">The Project:</b>
+            This <b>AI-Powered 3D Dashboard</b> predicts engine failure in real-time.
+            <br><br>
+            <b>Tech Stack:</b> Python, LSTM (Deep Learning), Three.js, NLP.
+            <br>
+            <b>Dataset:</b> <a href="https://www.kaggle.com/datasets/behrad3d/nasa-cmaps/code" target="_blank" style="color:#00ffff; text-decoration:underline;">NASA C-MAPSS Turbofan Dataset</a>.
+        </div>
+
+        <p><b>The Struggle:</b><br>
+        Transitioning from a creative background to Deep Learning was my biggest challenge. I faced steep learning curves, failed models, and complex bugs. But I didn't quit. I finished it. This project proves that with passion, even a non-IT professional can build enterprise-grade AI.</p>
+    </div>
+
+    <!-- Skills Section -->
+    <div style="margin-bottom:30px; border-top:1px solid #333; padding-top:20px;">
+        <h3 style="color:#fff; font-size:16px; margin-bottom:15px;">Technical Skills Used:</h3>
+        <div style="text-align:left;">
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">Python</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">TensorFlow / Keras</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">LSTM (RNN)</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">Scikit-Learn</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">PostgreSQL</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">Three.js</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">LangChain / GenAI</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">Flask</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">Docker</span>
+            <span style="background:#222; border:1px solid #444; padding:5px 10px; border-radius:4px; font-size:11px; color:#fff; margin:4px; display:inline-block;">3D Visualization</span>
+        </div>
+    </div>
+
+    <!-- Goal -->
+    <div style="text-align:center; margin-top:10px; padding:15px; background: rgba(0,0,0,0.3); border-radius:8px; border:1px solid #333; margin-bottom:30px;">
+        <span style="color:#fff; font-weight:bold; font-size:15px;">I am actively looking for opportunities in <span style="color:#00ffff;">AI, Data Science, and Generative AI.</span></span>
+    </div>
+
+    
+        <!-- Social Links -->
+    <div style="margin-top:10px; border-top:1px solid #333; padding-top:25px; text-align:center;">
+        <a href="https://uchaitukiran.wixsite.com/chaitumaya/gallery" target="_blank" style="background:#333; color:#fff; padding:10px 25px; border-radius:20px; text-decoration:none; margin:5px; font-weight:bold;">VFX Portfolio</a>
+        <a href="https://www.linkedin.com/in/chaitanya-kiran-b6b35234/" target="_blank" style="background:#0077b5; color:#fff; padding:10px 25px; border-radius:20px; text-decoration:none; margin:5px; font-weight:bold;">LinkedIn</a>
+        <a href="https://github.com/uchaitukiran" target="_blank" style="background:#333; color:#fff; padding:10px 25px; border-radius:20px; text-decoration:none; margin:5px; font-weight:bold;">GitHub</a>
+        <a href="mailto:uchaitukiran@gmail.com" style="background:#333; color:#fff; padding:10px 25px; border-radius:20px; text-decoration:none; margin:5px; font-weight:bold;">Email</a>
+    </div>
+</div>
+
+<!-- POWER BI IMAGE POPUP -->
+<div id="powerbi-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; height:90vh; background:rgba(10, 15, 30, 0.98); border:1px solid #f1c40f; border-radius:10px; z-index:9999; padding:0; flex-direction:column;">
+
+    <!-- Toolbar -->
+    <div style="background:rgba(0,0,0,0.5); padding:10px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center; border-radius:10px 10px 0 0;">
+        <div>
+           <!--  <button onclick="zoomInBI()" style="background:#333; color:#fff; border:1px solid #555; padding:5px 15px; cursor:pointer; border-radius:4px; margin-right:5px;">Zoom +</button>
+            <button onclick="zoomOutBI()" style="background:#333; color:#fff; border:1px solid #555; padding:5px 15px; cursor:pointer; border-radius:4px; margin-right:5px;">Zoom -</button> -->
+            <button onclick="resetBI()" style="background:#555; color:#fff; border:none; padding:5px 15px; cursor:pointer; border-radius:4px;">Reset</button>
+        </div>
+        <button onclick="closePowerBI()" style="background:transparent; border:1px solid #ff4444; color:#ff4444; cursor:pointer; padding:5px 15px; border-radius:5px; font-weight:bold;">CLOSE</button>
+    </div>
+
+    <!-- Image Container -->
+    <div id="bi-image-container" style="flex:1; overflow:hidden; cursor:grab; background:#111; display:flex; justify-content:center; align-items:center;">
+        <img id="bi-report-img" src="img/BI_Report.png" style="max-width:100%; max-height:100%; object-fit:contain;">
+    </div>
+
+</div>
 
 </body>
 </html>
