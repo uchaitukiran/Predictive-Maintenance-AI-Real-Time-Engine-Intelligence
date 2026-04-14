@@ -19,12 +19,13 @@ def generate_maintenance_report(data):
     try:
         llm = ChatGroq(
             temperature=0.7,
-            model_name="llama-3.1-8b-instant",  # <--- FIXED MODEL NAME
+            model_name="llama-3.1-8b-instant",
             groq_api_key=api_key
         )
         
+        # Prompt AI to ONLY analyze, not rewrite data
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a senior jet engine maintenance engineer. Provide a concise analysis."),
+            ("system", "You are a senior jet engine maintenance engineer. Provide a concise analysis and recommendations based on the provided status. Do NOT repeat the numbers, just analyze the situation."),
             ("human", "Analyze engine status:\nState: {state}\nRUL: {rul}\nTemp: {temp}\nPress: {press}\nVib: {vib}")
         ])
 
@@ -37,7 +38,19 @@ def generate_maintenance_report(data):
             "vib": f"{data.get('vibration', 0):.2f}"
         })
         
-        return response.content, None
+        # Construct Final Text (Injecting Correct Values Manually)
+        final_report = f"""
+**SENSOR DATA SNAPSHOT**
+- State: {data.get('state')}
+- RUL: {data.get('rul'):.2f} Cycles
+- Temperature: {data.get('temperature'):.2f}
+- Pressure: {data.get('pressure'):.2f}
+- Vibration: {data.get('vibration'):.2f}
+
+**AI ANALYSIS**
+{response.content}
+"""
+        return final_report, None
 
     except Exception as e:
         return None, str(e)

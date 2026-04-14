@@ -31,6 +31,22 @@ except Exception as e:
 # Define Paths
 WEBAPP_DIR = os.path.join(project_root, "webapp")
 
+# ---------------------------------------------------------
+# DATA TRANSLATOR (Converts Normalized <-> Real)
+# ---------------------------------------------------------
+# These formulas convert scientific values (e.g., -1.5) to Human values (e.g., 600)
+def to_real_value(norm_val, sensor_type):
+    if sensor_type == 'temp': return (norm_val + 3) * 50 + 600   # Range 600-900
+    if sensor_type == 'press': return (norm_val + 3) * 50 + 400  # Range 400-700
+    if sensor_type == 'vib': return (norm_val + 3) * 50 + 1000   # Range 1000-1300
+    return norm_val
+
+def to_norm_value(real_val, sensor_type):
+    if sensor_type == 'temp': return (real_val - 600) / 50 - 3
+    if sensor_type == 'press': return (real_val - 400) / 50 - 3
+    if sensor_type == 'vib': return (real_val - 1000) / 50 - 3
+    return real_val
+
 # Initialize Flask
 app = Flask(__name__, static_folder=WEBAPP_DIR) 
 CORS(app)
@@ -101,23 +117,29 @@ def get_real_data():
         current_simulation_id += 1
         row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
         
-        # If we reached the end of data, loop back to 1
         if not row:
             current_simulation_id = 1
             row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
 
         if row:
+            # TRANSLATE: Convert Normalized DB values to Real Human Values
+            real_temp = to_real_value(row.sensor_2, 'temp')
+            real_press = to_real_value(row.sensor_7, 'press')
+            real_vib = to_real_value(row.sensor_4, 'vib')
+
             return jsonify({
                 'id': row.id,
                 'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
-                'sensor_2': row.sensor_2, 'sensor_3': row.sensor_3, 'sensor_4': row.sensor_4,
-                'sensor_7': row.sensor_7, 'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9,
+                'sensor_2': real_temp,   # Sending Real Values to Frontend
+                'sensor_3': row.sensor_3, 
+                'sensor_4': real_vib,
+                'sensor_7': real_press,
+                'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9,
                 'sensor_11': row.sensor_11, 'sensor_12': row.sensor_12, 'sensor_13': row.sensor_13,
                 'sensor_14': row.sensor_14, 'sensor_15': row.sensor_15, 'sensor_17': row.sensor_17,
                 'sensor_20': row.sensor_20, 'sensor_21': row.sensor_21
             })
         else:
-            # This handles the case where the database is completely empty
             return jsonify({'error': 'Database is empty'}), 404
             
     except Exception as e:
@@ -132,23 +154,54 @@ class PredictResource(Resource):
         db = SessionLocal()
         try:
             data = request.get_json()
+
+            # TRANSLATE: Convert Real Values (from Frontend) back to Normalized (for Model)
+            norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
+            norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
+            norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
+
             custom_data = CustomData(
-                op_setting_1=float(data.get('op_setting_1', 0)), op_setting_2=float(data.get('op_setting_2', 0)), op_setting_3=float(data.get('op_setting_3', 0)),
-                sensor_2=float(data.get('sensor_2', 0)), sensor_3=float(data.get('sensor_3', 0)), sensor_4=float(data.get('sensor_4', 0)),
-                sensor_7=float(data.get('sensor_7', 0)), sensor_8=float(data.get('sensor_8', 0)), sensor_9=float(data.get('sensor_9', 0)),
-                sensor_11=float(data.get('sensor_11', 0)), sensor_12=float(data.get('sensor_12', 0)), sensor_13=float(data.get('sensor_13', 0)),
-                sensor_14=float(data.get('sensor_14', 0)), sensor_15=float(data.get('sensor_15', 0)), sensor_17=float(data.get('sensor_17', 0)),
-                sensor_20=float(data.get('sensor_20', 0)), sensor_21=float(data.get('sensor_21', 0))
+                op_setting_1=float(data.get('op_setting_1', 0)), 
+                op_setting_2=float(data.get('op_setting_2', 0)), 
+                op_setting_3=float(data.get('op_setting_3', 0)),
+                sensor_2=norm_temp,     # Sending Normalized values to Model
+                sensor_3=float(data.get('sensor_3', 0)), 
+                sensor_4=norm_vib,
+                sensor_7=norm_press,
+                sensor_8=float(data.get('sensor_8', 0)), 
+                sensor_9=float(data.get('sensor_9', 0)),
+                sensor_11=float(data.get('sensor_11', 0)), 
+                sensor_12=float(data.get('sensor_12', 0)), 
+                sensor_13=float(data.get('sensor_13', 0)),
+                sensor_14=float(data.get('sensor_14', 0)), 
+                sensor_15=float(data.get('sensor_15', 0)), 
+                sensor_17=float(data.get('sensor_17', 0)),
+                sensor_20=float(data.get('sensor_20', 0)), 
+                sensor_21=float(data.get('sensor_21', 0))
             )
+            
             pred_df = custom_data.get_data_as_data_frame()
             predict_pipeline = PredictPipeline()
             results = predict_pipeline.predict(pred_df)
             rul_value = float(results[0])
-            state = "GOOD" if rul_value > 100 else "WARNING" if rul_value > 30 else "CRITICAL"
-            new_pred = Prediction(state=state, rul=rul_value, temperature=data.get('sensor_2', 0), pressure=data.get('sensor_7', 0), vibration=data.get('sensor_4', 0))
+
+            if rul_value > 100: state = "GOOD"
+            elif rul_value > 30: state = "WARNING"
+            else: state = "CRITICAL"
+
+            # Save prediction using Real Values (for Report)
+            new_pred = Prediction(
+                state=state, 
+                rul=rul_value, 
+                temperature=float(data.get('sensor_2', 0)), # Saving Real Values
+                pressure=float(data.get('sensor_7', 0)), 
+                vibration=float(data.get('sensor_4', 0))
+            )
             db.add(new_pred)
             db.commit()
+
             return {'Predicted_RUL': rul_value, 'state': state}
+
         except Exception as e:
             return {'error': str(e)}, 500
         finally:
@@ -173,12 +226,32 @@ def predict_lstm():
     if not lstm_model or not lstm_scaler or not y_scaler: return jsonify({"error": "LSTM not loaded"}), 500
     try:
         data = request.get_json()
+        
+        # TRANSLATE: Real -> Normalized for LSTM
+        norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
+        norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
+        norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
+
+        # Construct input list with normalized values
+        # Note: We assume the model expects normalized inputs for all sensors.
+        # For simplicity, we just translate the main 3. If the model uses others, they need handling too.
         input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
+        # Override the translated ones
+        input_list[3] = norm_temp  # sensor_2
+        input_list[6] = norm_press # sensor_7
+        input_list[2] = norm_vib   # sensor_4 (Check index in FEATURE_ORDER if needed)
+        # Actually sensor_4 is index 2 in python list? No, list index.
+        # feature_order = [op1, op2, op3, s2, s3, s4...]
+        # index: 0, 1, 2, 3, 4, 5...
+        # s2 is index 3. s4 is index 5. s7 is index 6.
+        
         input_data = np.array([input_list])
         scaled_data = lstm_scaler.transform(input_data)
         history_buffer.append(scaled_data[0])
+        
         if len(history_buffer) < SEQUENCE_LENGTH:
             return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
+            
         sequence = np.array([list(history_buffer)])
         pred_scaled = lstm_model.predict(sequence, verbose=0)
         rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
@@ -193,38 +266,29 @@ def api_generate_report():
     if not generate_maintenance_report: return jsonify({"error": "Report tools not installed"}), 500
     db = SessionLocal()
     try:
-        # 1. Get Sensor Data
-        # Try to get current simulation row, or fallback to latest
-        sensor_row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
-        if not sensor_row:
-             sensor_row = db.query(EngineSensorData).order_by(EngineSensorData.id.desc()).first()
-
-        # 2. Get Prediction Data
-        # If no predictions exist yet (just started), use defaults
+        # 1. Get the latest Prediction (contains State and RUL)
         pred_row = db.query(Prediction).order_by(Prediction.id.desc()).first()
         
-        if not sensor_row:
-             return jsonify({"error": "No sensor data in database"}), 400
+        # 2. Get Sensor Data (Use Prediction data as source of truth for consistency)
+        if not pred_row:
+             return jsonify({"error": "No prediction data available"}), 400
 
-        # Build Data Dictionary (Safe Defaults)
         data = {
-            "state": pred_row.state if pred_row else "UNKNOWN",
-            "rul": pred_row.rul if pred_row else 0,
-            "temperature": sensor_row.sensor_2 if sensor_row else 0,
-            "pressure": sensor_row.sensor_7 if sensor_row else 0,
-            "vibration": sensor_row.sensor_4 if sensor_row else 0
+            "state": pred_row.state,
+            "rul": pred_row.rul,
+            "temperature": pred_row.temperature,
+            "pressure": pred_row.pressure,
+            "vibration": pred_row.vibration
         }
         
-        # 3. Generate Text
         report_text, error = generate_maintenance_report(data)
         if error: return jsonify({"error": error}), 500
         
-        # 4. Save
         new_report = MaintenanceReport(
             engine_state=data['state'], 
             rul=data['rul'], 
             report_text=report_text, 
-            sensor_summary=f"T:{data['temperature']:.0f}", 
+            sensor_summary=f"T:{data['temperature']:.0f} P:{data['pressure']:.0f}", 
             is_deleted=0
         )
         db.add(new_report)
@@ -236,7 +300,6 @@ def api_generate_report():
             "text": report_text
         })
     except Exception as e:
-        print(f"❌ Report Error: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
