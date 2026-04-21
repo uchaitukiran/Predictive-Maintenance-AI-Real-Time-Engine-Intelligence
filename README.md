@@ -1,11 +1,23 @@
 # Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
 
-![Python](https://img.shields.io/badge/Python-3.10-blue)
-![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey)
-![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-orange)
-![Pandas](https://img.shields.io/badge/Pandas-2.3.3-blue)
-![NumPy](https://img.shields.io/badge/NumPy-1.26.4-blue)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
+<p align="center">
+
+<img src="https://img.shields.io/badge/Python-3.10-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+<img src="https://img.shields.io/badge/Flask-3.0-000000?style=for-the-badge&logo=flask&logoColor=white" />
+<img src="https://img.shields.io/badge/TensorFlow-2.15-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white" />
+<img src="https://img.shields.io/badge/Pandas-2.3.3-150458?style=for-the-badge&logo=pandas&logoColor=white" />
+<img src="https://img.shields.io/badge/NumPy-1.26.4-013243?style=for-the-badge&logo=numpy&logoColor=white" />
+<img src="https://img.shields.io/badge/PostgreSQL-15-336791?style=for-the-badge&logo=postgresql&logoColor=white" />
+
+</p>
+
+<p align="center">
+
+<img src="https://img.shields.io/badge/AI-Powered-blueviolet?style=for-the-badge&logo=openai" />
+<img src="https://img.shields.io/badge/3D-Dashboard-orange?style=for-the-badge&logo=three.js" />
+<img src="https://img.shields.io/badge/Real--Time-Monitoring-success?style=for-the-badge" />
+
+</p>
 
 ---
 
@@ -17,6 +29,12 @@ Predictive Maintenance AI is an **end-to-end, enterprise-grade solution** for pr
 - 🤖 Machine Learning (XGBoost / GradientBoosting) → Robust regression  
 - 💬 NLP & LLM (Groq) → Log analysis & reasoning  
 - 🎮 3D Visualization (Three.js) → Real-time engine monitoring  
+
+## 📊 Dataset
+
+NASA Turbofan Engine Dataset (C-MAPSS):
+
+👉 https://www.kaggle.com/datasets/behrad3d/nasa-cmaps/code
 
 ---
 
