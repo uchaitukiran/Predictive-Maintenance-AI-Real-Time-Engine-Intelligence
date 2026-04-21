@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?size=28&duration=3000&color=00F7FF&center=true&vCenter=true&width=1000&lines=Predictive+Maintenance+AI;Real-Time+Engine+Intelligence;ML+%2B+LSTM+%2B+NLP+%2B+3D+Visualization;Built+with+Python+%7C+Flask+%7C+TensorFlow+%7C+Three.js" />
-</p>
+# Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
 
 <p align="center">
 
