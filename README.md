@@ -13,12 +13,10 @@
 
 Predictive Maintenance AI is an **end-to-end, enterprise-grade solution** for predicting **Remaining Useful Life (RUL)** of turbofan engines.
 
-It bridges the gap between **Data Science** and **Operational Intelligence** by combining:
-
-- 🧠 **Deep Learning (LSTM)** → Sequence-based RUL prediction  
-- 🤖 **Machine Learning (XGBoost / GradientBoosting)** → Robust regression analysis  
-- 💬 **NLP & LLM (Groq)** → Intelligent log analysis & reasoning  
-- 🎮 **3D Visualization (Three.js)** → Real-time interactive engine monitoring  
+- 🧠 Deep Learning (LSTM) → Sequence-based RUL prediction  
+- 🤖 Machine Learning (XGBoost / GradientBoosting) → Robust regression  
+- 💬 NLP & LLM (Groq) → Log analysis & reasoning  
+- 🎮 3D Visualization (Three.js) → Real-time engine monitoring  
 
 ---
 
@@ -44,32 +42,29 @@ It bridges the gap between **Data Science** and **Operational Intelligence** by 
 
 #### 1. Data Engineering
 - Raw NASA turbofan data is ingested and cleaned  
-- RUL (Remaining Useful Life) is calculated  
-- Data is normalized and prepared  
+- RUL is calculated  
+- Data is normalized  
 
 #### 2. Feature Engineering
-- Sensor features are selected and scaled  
+- Sensor features selected and scaled  
 - Optimized for real-time inference  
 
 #### 3. Model Training Pipeline
-- Multiple ML models trained:
-  - Gradient Boosting
-  - XGBoost
-  - LightGBM
-- Deep Learning:
-  - LSTM for sequence prediction  
+- Gradient Boosting  
+- XGBoost  
+- LightGBM  
+- LSTM (Deep Learning)  
 - Models saved as `.pkl` and `.keras`  
 
 #### 4. Backend API (Flask)
-- REST API handles:
-  - `/predict` → ML predictions  
-  - `/predict_lstm` → DL predictions  
-  - `/analyze_log` → NLP log analysis  
-  - `/generate_report` → PDF reports  
+- `/predict` → ML predictions  
+- `/predict_lstm` → DL predictions  
+- `/analyze_log` → NLP log analysis  
+- `/generate_report` → PDF reports  
 
 #### 5. AI Engine
-- Combines ML + DL + NLP  
-- Real-time inference engine  
+- ML + DL + NLP combined  
+- Real-time inference  
 
 #### 6. Data Storage
 - PostgreSQL stores:
@@ -78,12 +73,11 @@ It bridges the gap between **Data Science** and **Operational Intelligence** by 
   - Logs  
 
 #### 7. Frontend (3D Web App)
-- Built using **Three.js**
-- Features:
-  - Real-time engine visualization  
-  - Color-based health states  
-  - Live sensor gauges  
-  - Fault simulation (fire/smoke effects)  
+- Built using Three.js  
+- Real-time engine visualization  
+- Health state coloring  
+- Live gauges  
+- Fault simulation  
 
 ---
 
@@ -93,7 +87,7 @@ It bridges the gap between **Data Science** and **Operational Intelligence** by 
 |------|------|------|
 | Gradient Boosting | Primary RUL Prediction | `best_GradientBoosting.pkl` |
 | XGBoost / LightGBM | Alternative Predictions | `XGBoost.pkl`, `LightGBM.pkl` |
-| LSTM (Deep Learning) | Sequence RUL Prediction | `lstm_model.keras` |
+| LSTM | Sequence Prediction | `lstm_model.keras` |
 | NLP Classifier | Log Analysis | `nlp_log_classifier.pkl` |
 
 ---
@@ -117,50 +111,34 @@ Predictive-Maintenance-AI/
 │   └── css/
 ├── requirements.txt
 └── README.md
+```
 
 ---
 
 ## ⚙️ Tech Stack
 
-> Core technologies used in this project
-
 - Python 3.10  
-- Flask (Backend API)  
-- TensorFlow (LSTM)  
+- Flask  
+- TensorFlow  
 - Scikit-learn, XGBoost, LightGBM  
-- PostgreSQL (Database)  
-- Three.js (3D Visualization)  
+- PostgreSQL  
+- Three.js  
 
 ---
 
 ## ✨ Features
 
-> Key capabilities of the system
-
 - 🔥 Real-time engine monitoring  
 - 🧠 LSTM-based RUL prediction  
-- 🤖 Multiple ML regression models  
-- 💬 NLP + LLM log analysis  
-- 🎮 Interactive 3D dashboard
+- 🤖 Multiple ML models  
+- 💬 NLP + LLM analysis  
+- 🎮 3D dashboard  
 
 ---
 
 ## ⚡ Quick Start
 
 ### 1️⃣ Clone & Setup
-
-bash
-git clone https://github.com/your-username/your-repo.git
-cd Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-
----
-
-### ⚡ Quick Start
-
-#### 1️⃣ Clone & Setup
 
 ```bash
 git clone https://github.com/your-username/your-repo.git
@@ -172,7 +150,7 @@ pip install -r requirements.txt
 
 ---
 
-#### 2️⃣ Run Application
+### 2️⃣ Run Application
 
 ```bash
 python -m src.pipeline.train_pipeline
@@ -181,21 +159,21 @@ python -m src.api.app
 
 ---
 
-#### 3️⃣ Open in Browser
+### 3️⃣ Open in Browser
 
 👉 http://127.0.0.1:8000
 
 ---
 
-### 🔮 Future Scope
+## 🔮 Future Scope
 
-- 📚 RAG-based maintenance assistant  
-- 🐳 Docker containerization  
-- ☁️ Cloud deployment (AWS / GCP)  
-- ⚡ Real-time data streaming integration  
+- 📚 RAG-based assistant  
+- 🐳 Docker  
+- ☁️ Cloud deployment  
+- ⚡ Real-time streaming  
 
 ---
 
-### 📜 License
+## 📜 License
 
-This project is licensed under the MIT License.
+MIT License
