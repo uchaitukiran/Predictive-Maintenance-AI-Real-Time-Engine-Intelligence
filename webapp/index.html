@@ -41,6 +41,7 @@
 
     <button onclick="toggleVisualConsole()" style="background: linear-gradient(135deg, #34495e, #2c3e50);">Toggle Console</button>
     <button onclick="openPowerBI()" style="background: linear-gradient(135deg, #f1c40f, #f39c12); color:black; font-weight:bold;">POWER BI REPORT</button>
+    <button onclick="openArchitecture()" style="background: linear-gradient(135deg, #2ecc71, #27ae60); color:black; font-weight:bold;">PROJECT ARCHITECTURE</button>
     
     <div class="slider-container">
         <label>Environment Rotation</label>
@@ -271,6 +272,27 @@
     </div>
 
 </div>
+
+
+<!-- ARCHITECTURE IMAGE POPUP -->
+<div id="architecture-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; height:90vh; background:rgba(10, 15, 30, 0.98); border:1px solid #2ecc71; border-radius:10px; z-index:9999; padding:0; flex-direction:column;">
+
+    <!-- Toolbar -->
+    <div style="background:rgba(0,0,0,0.5); padding:10px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center; border-radius:10px 10px 0 0;">
+        <div>
+            <button onclick="resetArch()" style="background:#555; color:#fff; border:none; padding:5px 15px; cursor:pointer; border-radius:4px;">Reset</button>
+        </div>
+        <button onclick="closeArchitecture()" style="background:transparent; border:1px solid #ff4444; color:#ff4444; cursor:pointer; padding:5px 15px; border-radius:5px; font-weight:bold;">CLOSE</button>
+    </div>
+
+    <!-- Image Container -->
+    <div id="arch-image-container" style="flex:1; overflow:hidden; cursor:grab; background:#111; display:flex; justify-content:center; align-items:center;">
+        <!-- CORRECT PATH: webapp/img/architecture.png -->
+        <img id="arch-img" src="img/architecture.png" style="max-width:100%; max-height:100%; object-fit:contain;">
+    </div>
+
+</div>
+
 
 </body>
 </html>

@@ -1068,3 +1068,35 @@ function resetBI() {
         panzoomInstance.moveTo(0, 0);      // Reset Position
     }
 }
+
+
+let panzoomArch = null;
+
+function openArchitecture() {
+    const panel = document.getElementById("architecture-panel");
+    const img = document.getElementById("arch-img");
+    
+    panel.style.display = "flex"; 
+
+    if (!panzoomArch) {
+        panzoomArch = panzoom(img, {
+            maxZoom: 5.0,
+            minZoom: 0.5,
+            contain: 'outside',
+            startScale: 1.0
+        });
+    }
+    
+    resetArch();
+}
+
+function closeArchitecture() {
+    document.getElementById("architecture-panel").style.display = "none";
+}
+
+function resetArch() {
+    if (panzoomArch) {
+        panzoomArch.zoomAbs(0, 0, 1);
+        panzoomArch.moveTo(0, 0);
+    }
+}
