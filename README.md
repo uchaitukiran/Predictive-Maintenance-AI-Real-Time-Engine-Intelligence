@@ -100,25 +100,21 @@ It bridges the gap between **Data Science** and **Operational Intelligence** by 
 
 ## 📁 Project Structure
 
-bash
+```bash
 Predictive-Maintenance-AI/
-│
-├── artifacts/              # Saved Models & Preprocessors
-├── data/                   # Raw & Processed Data
-├── notebooks/              # Data Engineering & EDA
-│
+├── artifacts/
+├── data/
+├── notebooks/
 ├── src/
-│   ├── api/                # Flask Backend
-│   ├── components/         # ML Components
-│   ├── pipeline/           # Training Pipelines
-│   ├── database/           # DB Models
-│   └── utils/              # Helpers
-│
-├── webapp/                 # 3D Frontend
+│   ├── api/
+│   ├── components/
+│   ├── pipeline/
+│   ├── database/
+│   └── utils/
+├── webapp/
 │   ├── index.html
 │   ├── js/
 │   └── css/
-│
 ├── requirements.txt
 └── README.md
 
@@ -128,12 +124,12 @@ Predictive-Maintenance-AI/
 
 > Core technologies used in this project
 
-**Python 3.10**
-**Flask (Backend API)**
-**TensorFlow (LSTM)**
-**Scikit-learn, XGBoost, LightGBM**
-**PostgreSQL (Database)**
-**Three.js (3D Visualization)**
+- Python 3.10  
+- Flask (Backend API)  
+- TensorFlow (LSTM)  
+- Scikit-learn, XGBoost, LightGBM  
+- PostgreSQL (Database)  
+- Three.js (3D Visualization)  
 
 ---
 
@@ -141,11 +137,11 @@ Predictive-Maintenance-AI/
 
 > Key capabilities of the system
 
-🔥 **Real-time engine monitoring**
-🧠 **LSTM-based RUL prediction**
-🤖 **Multiple ML regression models**
-💬 **NLP + LLM log analysis**
-🎮 **Interactive 3D dashboard**
+- 🔥 Real-time engine monitoring  
+- 🧠 LSTM-based RUL prediction  
+- 🤖 Multiple ML regression models  
+- 💬 NLP + LLM log analysis  
+- 🎮 Interactive 3D dashboard
 
 ---
 
@@ -162,34 +158,44 @@ pip install -r requirements.txt
 
 ---
 
-## 2️⃣ Run Application
+### ⚡ Quick Start
 
-> Start training and backend services
+#### 1️⃣ Clone & Setup
 
-bash
-python -m src.pipeline.train_pipeline
-python -m src.api.app
-
-## 3️⃣ Open in Browser
-
-> Access the live 3D dashboard
-
-👉 **http://127.0.0.1:8000**
+```bash
+git clone https://github.com/your-username/your-repo.git
+cd Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
 
 ---
 
-## 🔮 Future Scope
+#### 2️⃣ Run Application
 
-> Planned enhancements
+```bash
+python -m src.pipeline.train_pipeline
+python -m src.api.app
+```
 
-📚 **RAG-based maintenance assistant**
-🐳 **Docker containerization**
-☁️ **Cloud deployment (AWS / GCP)**
-⚡ **Real-time data streaming integration**
+---
 
+#### 3️⃣ Open in Browser
 
-## 📜 License
+👉 http://127.0.0.1:8000
 
-> Usage and distribution
+---
 
-This project is licensed under the **MIT License**.
+### 🔮 Future Scope
+
+- 📚 RAG-based maintenance assistant  
+- 🐳 Docker containerization  
+- ☁️ Cloud deployment (AWS / GCP)  
+- ⚡ Real-time data streaming integration  
+
+---
+
+### 📜 License
+
+This project is licensed under the MIT License.
