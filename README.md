@@ -122,41 +122,75 @@ Predictive-Maintenance-AI/
 ├── requirements.txt
 └── README.md
 
-⚙️ Tech Stack
- . Python 3.10
- . Flask
- . TensorFlow (LSTM)
- . Scikit-learn, XGBoost, LightGBM
- . PostgreSQL
- . Three.js
+---
 
- 🚀 Features
-🔥 Real-time engine monitoring
-🧠 LSTM-based RUL prediction
-🤖 ML regression models
-💬 NLP + LLM log analysis
-🎮 Interactive 3D dashboard
+## ⚙️ Tech Stack
 
-⚡ Quick Start
-git clone https://github.com/your-repo.git
+> Core technologies used in this project
+
+- **Python 3.10**
+- **Flask (Backend API)**
+- **TensorFlow (LSTM)**
+- **Scikit-learn, XGBoost, LightGBM**
+- **PostgreSQL (Database)**
+- **Three.js (3D Visualization)**
+
+---
+
+## ✨ Features
+
+> Key capabilities of the system
+
+- 🔥 **Real-time engine monitoring**
+- 🧠 **LSTM-based RUL prediction**
+- 🤖 **Multiple ML regression models**
+- 💬 **NLP + LLM log analysis**
+- 🎮 **Interactive 3D dashboard**
+
+---
+
+## ⚡ Quick Start
+
+### 1️⃣ Clone & Setup
+
+```bash
+git clone https://github.com/your-username/your-repo.git
 cd Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
-Run:
+---
+
+## 2️⃣ Run Application
+
+> Start training and backend services
+
+```bash
 python -m src.pipeline.train_pipeline
 python -m src.api.app
 
-Open:
-http://127.0.0.1:8000
+## 3️⃣ Open in Browser
 
-🔮 Future Scope
-RAG-based maintenance assistant
-Docker containerization
-Cloud deployment (AWS / GCP)
-Real-time streaming integration
+> Access the live 3D dashboard
 
-📜 License
+👉 **http://127.0.0.1:8000**
 
-This project is licensed under the MIT License.
+---
+
+## 🔮 Future Scope
+
+> Planned enhancements
+
+- 📚 **RAG-based maintenance assistant**
+- 🐳 **Docker containerization**
+- ☁️ **Cloud deployment (AWS / GCP)**
+- ⚡ **Real-time data streaming integration**
+
+---
+
+## 📜 License
+
+> Usage and distribution
+
+This project is licensed under the **MIT License**.
