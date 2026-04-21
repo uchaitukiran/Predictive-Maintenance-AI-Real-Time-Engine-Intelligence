@@ -1,30 +1,44 @@
-# 🚀 Predictive Maintenance AI
+# Predictive-Maintenance-AI-Real-Time-Engine-Intelligence
 
-### Real-Time Engine Health Monitoring using ML + LSTM + 3D Visualization
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-orange)
+![Pandas](https://img.shields.io/badge/Pandas-2.3.3-blue)
+![NumPy](https://img.shields.io/badge/NumPy-1.26.4-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
 
 ---
 
-## 📸 Live 3D Dashboard
+## 🚀 Project Overview
+
+Predictive Maintenance AI is an **end-to-end, enterprise-grade solution** for predicting **Remaining Useful Life (RUL)** of turbofan engines.
+
+It bridges the gap between **Data Science** and **Operational Intelligence** by combining:
+
+- 🧠 **Deep Learning (LSTM)** → Sequence-based RUL prediction  
+- 🤖 **Machine Learning (XGBoost / GradientBoosting)** → Robust regression analysis  
+- 💬 **NLP & LLM (Groq)** → Intelligent log analysis & reasoning  
+- 🎮 **3D Visualization (Three.js)** → Real-time interactive engine monitoring  
+
+---
+
+## 📸 3D Web App Output
 
 <p align="center">
   <img src="assets/images/dashboard.png" width="95%">
 </p>
 
----
-
-## 🧠 Project Overview
-
-Predictive Maintenance AI is a real-time engine health monitoring system that combines **Machine Learning (ML)**, **Deep Learning (LSTM)**, and **Natural Language Processing (NLP)** with an interactive **3D Web Interface**.
-
-The system predicts **Remaining Useful Life (RUL)** of turbofan engines using the **NASA C-MAPSS dataset** and visualizes engine state (**Good / Warning / Critical**) in a real-time 3D environment.
+> Real-time 3D Engine Health Dashboard showing **Warning State**
 
 ---
 
-## 🧩 Project Architecture
+## 🧠 Project Architecture
 
 <p align="center">
   <img src="assets/images/architecture.png" width="95%">
 </p>
+
+---
 
 ### 🔹 Flow Explanation
 
@@ -142,3 +156,7 @@ RAG-based maintenance assistant
 Docker containerization
 Cloud deployment (AWS / GCP)
 Real-time streaming integration
+
+📜 License
+
+This project is licensed under the MIT License.
