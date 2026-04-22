@@ -1100,3 +1100,51 @@ function resetArch() {
         panzoomArch.moveTo(0, 0);
     }
 }
+
+
+// RAG Functions
+
+async function sendRagQuery() {
+    const input = document.getElementById("rag-input");
+    const query = input.value.trim();
+
+    if (!query) return;
+
+    // Open Modal
+    openRagModal(query);
+
+    try {
+        const res = await fetch("http://127.0.0.1:8000/rag_chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: query })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+            document.getElementById("rag-modal-answer").innerText = "Error: " + data.error;
+            document.getElementById("rag-modal-answer").style.color = "#ff4444";
+        } else {
+            document.getElementById("rag-modal-answer").innerText = data.answer;
+            document.getElementById("rag-modal-answer").style.color = "#eee";
+            // Removed sources logic
+        }
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById("rag-modal-answer").innerText = "Connection Error.";
+        document.getElementById("rag-modal-answer").style.color = "#ff4444";
+    }
+}
+
+function openRagModal(question) {
+    document.getElementById("rag-modal").style.display = "block";
+    document.getElementById("rag-modal-question").innerText = question;
+    document.getElementById("rag-modal-answer").innerText = "Thinking...";
+    document.getElementById("rag-modal-answer").style.color = "#ffaa00";
+}
+
+function closeRagModal() {
+    document.getElementById("rag-modal").style.display = "none";
+}

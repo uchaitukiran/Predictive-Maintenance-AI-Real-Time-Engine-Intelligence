@@ -9,6 +9,7 @@ import numpy as np
 from collections import deque
 from tensorflow.keras.models import load_model
 
+
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
@@ -70,6 +71,54 @@ def serve_static(path):
             return "File not found", 404
     except Exception as e:
         return str(e), 500
+    
+
+@app.route("/rag_chat", methods=["POST"])
+def rag_chat():
+    db = SessionLocal()
+    try:
+        data = request.get_json()
+        query = data.get("query", "")
+        
+        if not query:
+            return jsonify({"error": "No query provided"}), 400
+        
+        # 1. Import RAG (Heavy load happens here)
+        # We do it safely so if it fails, we return a message instead of crashing
+        try:
+            from src.rag.retriever import ask_question
+        except Exception as import_error:
+            print(f"❌ RAG Import Error: {import_error}")
+            return jsonify({"error": "AI Brain is loading or failed to start. Check server logs."}), 500
+
+        # 2. Get Live Data
+        last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
+        
+        live_context = None
+        if last_pred:
+            live_context = {
+                "state": last_pred.state,
+                "rul": last_pred.rul,
+                "temperature": last_pred.temperature,
+                "pressure": last_pred.pressure,
+                "vibration": last_pred.vibration
+            }
+        
+        # 3. Call RAG
+        answer, sources = ask_question(query, live_context)
+        
+        return jsonify({
+            "answer": answer,
+            "sources": sources
+        })
+        
+    except Exception as e:
+        print(f"❌ RAG Runtime Error: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+    
+
 
 # API Setup
 api = Api(app, version='1.0', title='Engine Health Monitoring API', doc='/docs')
@@ -348,6 +397,31 @@ def api_delete_report(report_id):
         return jsonify({"status": "success"})
     finally:
         db.close()
+
+
+import threading
+
+def load_rag_models_background():
+    """Loads heavy RAG models in background so first request is fast."""
+    print("🔄 Background Loader: Warming up RAG models...")
+    try:
+        from src.rag.retriever import ask_question
+        # Ask a dummy question to force model load
+        ask_question("test", None)
+        print("✅ Background Loader: RAG Models Ready!")
+    except Exception as e:
+        print(f"⚠️ Background Loader Failed: {e}")
+
+# Start loader in a separate thread
+if __name__ == "__main__":
+    # Start background thread
+    loader_thread = threading.Thread(target=load_rag_models_background)
+    loader_thread.daemon = True
+    loader_thread.start()
+
+    print("🚀 Starting Flask Server...")
+    app.run(host="0.0.0.0", port=8000, debug=True)
+
 
 if __name__ == "__main__":
     print("🚀 Starting Flask Server...")

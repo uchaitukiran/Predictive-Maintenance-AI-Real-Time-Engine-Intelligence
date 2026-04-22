@@ -99,7 +99,7 @@
 </div>
 
          <!-- LSTM PREDICTION BOX -->
-<div class="status-box" id="lstmBox" style="top: 410px; right: 10px; width: 300px;">
+<div class="status-box" id="lstmBox" style="top: 400px; right: 10px; width: 300px;">
     <div class="mc-header">
         <h2>DEEP LEARNING AI</h2>
         <div class="live-indicator"><span class="blink-dot"></span> LSTM</div>
@@ -119,12 +119,79 @@
     </div>
 </div>
 
+
+
+<!-- RAG CHAT BOX (Compact) -->
+<div class="status-box" id="ragBox" style="top: 660px; right: 10px; width: 300px; height: auto;">
+    <div class="mc-header">
+        <h2>AI MECHANIC</h2>
+        <div class="live-indicator"><span class="blink-dot"></span> RAG</div>
+    </div>
+    <div style="padding: 10px;">
+        <span class="mc-label">ASK ENGINE MANUAL</span>
+        
+        <!-- Input -->
+        <input type="text" id="rag-input" placeholder="Type a question..." style="width: 100%; margin-top: 5px; padding: 8px; background: #111; border: 1px solid #00ffff; color: #fff; border-radius: 4px; box-sizing: border-box;">
+        
+        <!-- Ask Button -->
+        <button onclick="sendRagQuery()" style="width: 100%; margin-top: 5px; background: linear-gradient(135deg, #00ffff, #00cccc); color: black; border: none; padding: 8px; cursor: pointer; font-weight: bold; border-radius: 4px;">ASK AI</button>
+        
+        <!-- Example Questions -->
+        <div style="margin-top: 10px; border-top: 1px solid #333; padding-top: 8px;">
+            <span class="mc-label" style="font-size: 10px; color: #888;">EXAMPLES:</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                <button onclick="askExample('What causes high vibration?')" style="background: #222; border: 1px solid #555; color: #aaa; padding: 3px 6px; font-size: 10px; cursor: pointer; border-radius: 3px;">High Vibration?</button>
+                <button onclick="askExample('How to fix EGT?')" style="background: #222; border: 1px solid #555; color: #aaa; padding: 3px 6px; font-size: 10px; cursor: pointer; border-radius: 3px;">Fix EGT?</button>
+                <button onclick="askExample('Explain Health Index')" style="background: #222; border: 1px solid #555; color: #aaa; padding: 3px 6px; font-size: 10px; cursor: pointer; border-radius: 3px;">Health Index?</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- RAG ANSWER MODAL -->
+<div id="rag-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:500px; max-height:80vh; background:rgba(10, 15, 30, 0.98); border:1px solid #00ffff; border-radius:10px; z-index:9999; padding:20px; color:white; font-family:Arial; box-shadow: 0 0 30px rgba(0,255,255,0.2);">
+    
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #00ffff; padding-bottom:10px; margin-bottom:15px;">
+        <h3 style="margin:0; color:#00ffff;">AI MECHANIC RESPONSE</h3>
+        <button onclick="closeRagModal()" style="background:transparent; border:1px solid #ff4444; color:#ff4444; cursor:pointer; padding:2px 8px; border-radius:4px; font-weight:bold;">X</button>
+    </div>
+
+    <!-- Content -->
+    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;">
+        <div style="width:40px; height:40px; background:#00ffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold; font-size:20px;">?</div>
+        <div id="rag-modal-question" style="color:#fff; font-weight:bold; font-size:14px;"></div>
+    </div>
+
+    <div id="rag-modal-answer" style="color:#eee; font-size:14px; line-height:1.6; background:rgba(0,0,0,0.3); padding:15px; border-radius:5px; max-height: 300px; overflow-y: auto;">
+        Thinking...
+    </div>
+
+    <div style="margin-top:15px; font-size:10px; color:#666;">
+        Sources: <span id="rag-modal-sources">None</span>
+    </div>
+</div>
+
+
+
 <!-- LEGEND -->
-<div class="legend">
-    <h3>Health Legend</h3>
-    <div class="legend-item"><span class="dot green"></span> GOOD</div>
-    <div class="legend-item"><span class="dot yellow"></span> WARNING</div>
-    <div class="legend-item"><span class="dot red"></span> CRITICAL</div>
+<!-- LEGEND (Horizontal) -->
+<div class="legend" style="display: flex; align-items: center; gap: 15px; padding: 10px 15px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #444;">
+    <div style="display:flex; align-items:center; gap:5px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#2ecc71;"></span>
+        <span style="color:#2ecc71; font-weight:bold; font-size:12px;">GOOD</span>
+    </div>
+    <span style="color:#444;">|</span>
+    <div style="display:flex; align-items:center; gap:5px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#f1c40f;"></span>
+        <span style="color:#f1c40f; font-weight:bold; font-size:12px;">WARNING</span>
+    </div>
+    <span style="color:#444;">|</span>
+    <div style="display:flex; align-items:center; gap:5px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#e74c3c;"></span>
+        <span style="color:#e74c3c; font-weight:bold; font-size:12px;">CRITICAL</span>
+    </div>
 </div>
 
 <!-- AUDIO ELEMENTS -->
@@ -292,6 +359,8 @@
     </div>
 
 </div>
+
+
 
 
 </body>
