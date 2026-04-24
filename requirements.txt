@@ -42,3 +42,4 @@ tqdm
 flake8
 
 gunicorn
+fpdf

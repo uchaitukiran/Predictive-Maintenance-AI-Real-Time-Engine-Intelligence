@@ -142,7 +142,15 @@ LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
 SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
 Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 
-lstm_model = load_model(LSTM_MODEL_PATH) if os.path.exists(LSTM_MODEL_PATH) else None
+# New Code (Safe)
+try:
+    if os.path.exists(LSTM_MODEL_PATH):
+        lstm_model = load_model(LSTM_MODEL_PATH)
+    else:
+        lstm_model = None
+except Exception as e:
+    print(f"⚠️ LSTM Model loading failed: {e}")
+    lstm_model = None
 lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
 y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
 if lstm_model: print("✅ LSTM Model Loaded.")
