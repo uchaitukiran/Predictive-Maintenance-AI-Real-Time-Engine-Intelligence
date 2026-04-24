@@ -155,6 +155,7 @@ lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
 y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
 if lstm_model: print("✅ LSTM Model Loaded.")
 
+
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
 FEATURE_ORDER = ['op_setting_1', 'op_setting_2', 'op_setting_3', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_7', 'sensor_8', 'sensor_9', 'sensor_11', 'sensor_12', 'sensor_13', 'sensor_14', 'sensor_15', 'sensor_17', 'sensor_20', 'sensor_21']

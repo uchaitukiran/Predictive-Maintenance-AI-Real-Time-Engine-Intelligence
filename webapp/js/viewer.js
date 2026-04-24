@@ -460,10 +460,10 @@ async function getPrediction() {
     if (isDemoMode) return;
 
     try {
-        const dataRes = await fetch("http://127.0.0.1:8000/get_real_data");
+        const dataRes = await fetch("/get_real_data");
         const sensorData = await dataRes.json();
 
-        const res = await fetch("http://127.0.0.1:8000/predict", { 
+        const res = await fetch("/predict", { 
             method: "POST", 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(sensorData)
@@ -874,7 +874,7 @@ async function getNLPAnalysis(state) {
 
     try {
         // 1. Call the API
-        const res = await fetch("http://127.0.0.1:8000/analyze_log", {
+        const res = await fetch("/analyze_log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ state: state })
@@ -888,9 +888,15 @@ async function getNLPAnalysis(state) {
         const data = await res.json();
 
         // 3. Update UI
-        let color = "#00ffff"; // Cyan
-        if (data.predicted_status === "CRITICAL") color = "#ff4444"; // Red
-        if (data.predicted_status === "WARNING") color = "#ffaa00"; // Orange
+       // Find the lines inside getNLPAnalysis function:
+           let color = "#00ffff"; // Default Cyan
+
+       // ADD THIS LINE for Green:
+        if (data.predicted_status === "GOOD") color = "#2ecc71"; 
+
+      // Existing lines:
+      if (data.predicted_status === "WARNING") color = "#f1c40f"; // Yellow
+      if (data.predicted_status === "CRITICAL") color = "#e74c3c"; // Red
 
         updateLog(data.log_message, color);
 
@@ -905,7 +911,7 @@ async function getNLPAnalysis(state) {
 // ---------------------------------------------------------
 async function getLSTMPrediction(sensorData) {
     try {
-        const res = await fetch("http://127.0.0.1:8000/predict_lstm", {
+        const res = await fetch("/predict_lstm", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(sensorData)
@@ -924,7 +930,7 @@ async function getLSTMPrediction(sensorData) {
 }
 
 function downloadReport() {
-    window.location.href = "http://127.0.0.1:8000/generate_report";
+     window.location.href = "/generate_report";
 }
 
 
@@ -934,7 +940,7 @@ let currentReportId = null;
 // 1. Generate Report
 async function generateReport() {
     try {
-        const res = await fetch("http://127.0.0.1:8000/generate_report", { method: "POST" });
+        const res = await fetch("/generate_report", { method: "POST" });
         const result = await res.json();
 
         if (result.status === "success") {
@@ -958,13 +964,13 @@ function closeReportModal() {
 // 3. Download
 function downloadCurrentReport() {
     if (currentReportId) {
-        window.open(`http://127.0.0.1:8000/download_report/${currentReportId}`, '_blank');
+        window.open(`/download_report/${currentReportId}`, '_blank');
     }
 }
 
 // 4. Show History (Refined)
 async function showHistory() {
-    const res = await fetch("http://127.0.0.1:8000/report_history");
+    const res = await fetch("/report_history");
     const history = await res.json();
     
     const list = document.getElementById("history-list");
@@ -1003,7 +1009,7 @@ function closeHistory() {
 // 5. View Report (Loads text into modal)
 async function viewReport(id) {
     currentReportId = id;
-    const res = await fetch(`http://127.0.0.1:8000/view_report/${id}`);
+    const res = await fetch(`/view_report/${id}`);
     const data = await res.json();
     
     document.getElementById("report-content").innerText = data.text;
@@ -1013,7 +1019,7 @@ async function viewReport(id) {
 // 6. Delete Report
 async function deleteReport(id) {
     if(confirm("Are you sure you want to delete this report?")) {
-        await fetch(`http://127.0.0.1:8000/delete_report/${id}`, { method: "POST" });
+        await fetch(`/delete_report/${id}`, { method: "POST" });
         showHistory(); // Refresh list
     }
 }
@@ -1114,7 +1120,7 @@ async function sendRagQuery() {
     openRagModal(query);
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/rag_chat", {
+        const res = await fetch("/rag_chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query: query })
