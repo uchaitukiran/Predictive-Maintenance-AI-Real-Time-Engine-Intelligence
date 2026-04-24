@@ -432,19 +432,18 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
 
 
-# Add this function to ensure tables are created on startup
-def initialize_database():
-    print("🔄 Checking Database Tables...")
+# Initialize Database Tables on Startup
+def init_db():
+    print("🚀 Initializing Database Tables...")
     try:
-        from src.database.db import engine, Base
-        from src.database import models # Ensure models are imported
+        from src.database.db import Base, engine
+        from src.database.models import EngineSensorData, Prediction, MaintenanceReport
         Base.metadata.create_all(bind=engine)
-        print("✅ Database Tables Created/Verified.")
+        print("✅ Database Tables Ready.")
     except Exception as e:
-        print(f"❌ Database Init Error: {e}")
+        print(f"❌ DB Init Error: {e}")
 
-# Call this function right before app.run
-initialize_database()
+init_db()
 
 
 
