@@ -123,9 +123,9 @@ celerybeat-schedule
 *.sqlite
 
 # model files
-*.pkl
+.pkl
 *.joblib
-*.h5
+.h5
 
 # data files
 *.csv
