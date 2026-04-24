@@ -432,6 +432,22 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
 
 
+# Add this function to ensure tables are created on startup
+def initialize_database():
+    print("🔄 Checking Database Tables...")
+    try:
+        from src.database.db import engine, Base
+        from src.database import models # Ensure models are imported
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database Tables Created/Verified.")
+    except Exception as e:
+        print(f"❌ Database Init Error: {e}")
+
+# Call this function right before app.run
+initialize_database()
+
+
+
 if __name__ == "__main__":
     print("🚀 Starting Flask Server...")
     app.run(host="0.0.0.0", port=8000, debug=True)

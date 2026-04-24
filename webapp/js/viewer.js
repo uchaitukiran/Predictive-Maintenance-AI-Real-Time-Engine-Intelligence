@@ -864,7 +864,6 @@ function updateFaultIndicator(targetPart, state) {
 async function getNLPAnalysis(state) {
     const logText = document.getElementById("nlp-log-text");
     
-    // Helper to update text
     const updateLog = (msg, color) => {
         if (logText) {
             logText.innerText = "> " + msg;
@@ -873,36 +872,33 @@ async function getNLPAnalysis(state) {
     };
 
     try {
-        // 1. Call the API
         const res = await fetch("/analyze_log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ state: state })
         });
 
-        // 2. Check if server responded OK
-        if (!res.ok) {
-            throw new Error(`Server Error: ${res.status}`);
-        }
+        if (!res.ok) throw new Error("Server error");
 
         const data = await res.json();
 
-        // 3. Update UI
-       // Find the lines inside getNLPAnalysis function:
-           let color = "#00ffff"; // Default Cyan
+        // --- FIX: STRICT COLOR MAPPING ---
+        let color = "#ffffff"; // Default white
 
-       // ADD THIS LINE for Green:
-        if (data.predicted_status === "GOOD") color = "#2ecc71"; 
-
-      // Existing lines:
-      if (data.predicted_status === "WARNING") color = "#f1c40f"; // Yellow
-      if (data.predicted_status === "CRITICAL") color = "#e74c3c"; // Red
+        if (data.predicted_status === "GOOD") {
+            color = "#2ecc71"; // GREEN
+        } else if (data.predicted_status === "WARNING") {
+            color = "#f1c40f"; // YELLOW
+        } else if (data.predicted_status === "CRITICAL") {
+            color = "#e74c3c"; // RED
+        }
+        // ----------------------------------
 
         updateLog(data.log_message, color);
 
     } catch (err) {
-        console.error("❌ NLP Error:", err);
-        updateLog("Error: Could not connect to AI", "#ff4444");
+        console.error("NLP Error:", err);
+        updateLog("Connection Error", "#ff4444");
     }
 }
 
