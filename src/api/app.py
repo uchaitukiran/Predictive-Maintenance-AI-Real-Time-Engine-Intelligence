@@ -281,7 +281,14 @@ def analyze_log():
 
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    if not lstm_model or not lstm_scaler or not y_scaler: return jsonify({"error": "LSTM not loaded"}), 500
+    # Graceful failure if model didn't load
+    if not lstm_model or not lstm_scaler or not y_scaler:
+        return jsonify({
+            "prediction": 0, 
+            "status": "UNAVAILABLE", 
+            "message": "LSTM Model file is corrupt. Please re-upload valid model."
+        })
+    
     try:
         data = request.get_json()
         
@@ -290,33 +297,41 @@ def predict_lstm():
         norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
         norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
 
-        # Construct input list with normalized values
-        # Note: We assume the model expects normalized inputs for all sensors.
-        # For simplicity, we just translate the main 3. If the model uses others, they need handling too.
+        # Construct input list
         input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
+        
         # Override the translated ones
-        input_list[3] = norm_temp  # sensor_2
-        input_list[6] = norm_press # sensor_7
-        input_list[2] = norm_vib   # sensor_4 (Check index in FEATURE_ORDER if needed)
-        # Actually sensor_4 is index 2 in python list? No, list index.
-        # feature_order = [op1, op2, op3, s2, s3, s4...]
-        # index: 0, 1, 2, 3, 4, 5...
-        # s2 is index 3. s4 is index 5. s7 is index 6.
+        # Feature Order: op1, op2, op3, s2, s3, s4...
+        # s2 is index 3, s4 is index 5, s7 is index 6
+        input_list[3] = norm_temp   # sensor_2
+        input_list[6] = norm_press  # sensor_7
+        input_list[5] = norm_vib    # sensor_4
         
         input_data = np.array([input_list])
         scaled_data = lstm_scaler.transform(input_data)
         history_buffer.append(scaled_data[0])
         
         if len(history_buffer) < SEQUENCE_LENGTH:
-            return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
+            return jsonify({
+                "prediction": 0, 
+                "status": "ACCUMULATING", 
+                "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"
+            })
             
         sequence = np.array([list(history_buffer)])
         pred_scaled = lstm_model.predict(sequence, verbose=0)
+        
+        # This calculates the rul variable
         rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
-        return jsonify({"prediction": float(rul), "status": "ACTIVE", "message": "Deep Learning Analysis Complete"})
+        
+        return jsonify({
+            "prediction": float(rul), 
+            "status": "ACTIVE", 
+            "message": "Deep Learning Analysis Complete"
+        })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 # --- REPORT GENERATION ENDPOINTS ---
 
 @app.route("/generate_report", methods=["POST"])
