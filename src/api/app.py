@@ -8,7 +8,7 @@ import re
 import numpy as np
 from collections import deque
 from tensorflow.keras.models import load_model
-
+import threading
 
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -16,9 +16,23 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.insert(0, project_root)
 
 # Import Components
-from src.database.db import SessionLocal
+from src.database.db import SessionLocal, Base, engine
 from src.database.models import EngineSensorData, Prediction, MaintenanceReport
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
+
+# ---------------------------------------------------------
+# 1. INITIALIZE DATABASE TABLES (MUST RUN FIRST)
+# ---------------------------------------------------------
+def init_db():
+    print("🚀 Initializing Database Tables...")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database Tables Ready.")
+    except Exception as e:
+        print(f"❌ DB Init Error: {e}")
+
+# Run DB Init immediately
+init_db()
 
 # Safe Import for Reports
 try:
@@ -33,13 +47,12 @@ except Exception as e:
 WEBAPP_DIR = os.path.join(project_root, "webapp")
 
 # ---------------------------------------------------------
-# DATA TRANSLATOR (Converts Normalized <-> Real)
+# DATA TRANSLATOR
 # ---------------------------------------------------------
-# These formulas convert scientific values (e.g., -1.5) to Human values (e.g., 600)
 def to_real_value(norm_val, sensor_type):
-    if sensor_type == 'temp': return (norm_val + 3) * 50 + 600   # Range 600-900
-    if sensor_type == 'press': return (norm_val + 3) * 50 + 400  # Range 400-700
-    if sensor_type == 'vib': return (norm_val + 3) * 50 + 1000   # Range 1000-1300
+    if sensor_type == 'temp': return (norm_val + 3) * 50 + 600
+    if sensor_type == 'press': return (norm_val + 3) * 50 + 400
+    if sensor_type == 'vib': return (norm_val + 3) * 50 + 1000
     return norm_val
 
 def to_norm_value(real_val, sensor_type):
@@ -51,6 +64,25 @@ def to_norm_value(real_val, sensor_type):
 # Initialize Flask
 app = Flask(__name__, static_folder=WEBAPP_DIR) 
 CORS(app)
+
+# ---------------------------------------------------------
+# 2. START RAG LOADER (MUST RUN ON IMPORT, NOT IN MAIN)
+# ---------------------------------------------------------
+def load_rag_models_background():
+    """Loads heavy RAG models in background so first request is fast."""
+    print("🔄 Background Loader: Warming up RAG models...")
+    try:
+        from src.rag.retriever import ask_question
+        # Ask a dummy question to force model load
+        ask_question("test", None)
+        print("✅ Background Loader: RAG Models Ready!")
+    except Exception as e:
+        print(f"⚠️ Background Loader Failed: {e}")
+
+# Start the thread immediately when script loads
+rag_thread = threading.Thread(target=load_rag_models_background)
+rag_thread.daemon = True
+rag_thread.start()
 
 # Routes for Webpage
 @app.route("/", methods=['GET'])
@@ -72,7 +104,6 @@ def serve_static(path):
     except Exception as e:
         return str(e), 500
     
-
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
     db = SessionLocal()
@@ -83,15 +114,13 @@ def rag_chat():
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        # 1. Import RAG (Heavy load happens here)
-        # We do it safely so if it fails, we return a message instead of crashing
+        # Import happens instantly now because models are loaded in background
         try:
             from src.rag.retriever import ask_question
         except Exception as import_error:
             print(f"❌ RAG Import Error: {import_error}")
             return jsonify({"error": "AI Brain is loading or failed to start. Check server logs."}), 500
 
-        # 2. Get Live Data
         last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
         
         live_context = None
@@ -104,7 +133,6 @@ def rag_chat():
                 "vibration": last_pred.vibration
             }
         
-        # 3. Call RAG
         answer, sources = ask_question(query, live_context)
         
         return jsonify({
@@ -117,8 +145,6 @@ def rag_chat():
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
-    
-
 
 # API Setup
 api = Api(app, version='1.0', title='Engine Health Monitoring API', doc='/docs')
@@ -142,7 +168,6 @@ LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
 SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
 Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 
-# New Code (Safe)
 try:
     if os.path.exists(LSTM_MODEL_PATH):
         lstm_model = load_model(LSTM_MODEL_PATH)
@@ -151,10 +176,10 @@ try:
 except Exception as e:
     print(f"⚠️ LSTM Model loading failed: {e}")
     lstm_model = None
+    
 lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
 y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
 if lstm_model: print("✅ LSTM Model Loaded.")
-
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
@@ -180,7 +205,6 @@ def get_real_data():
             row = db.query(EngineSensorData).filter(EngineSensorData.id == current_simulation_id).first()
 
         if row:
-            # TRANSLATE: Convert Normalized DB values to Real Human Values
             real_temp = to_real_value(row.sensor_2, 'temp')
             real_press = to_real_value(row.sensor_7, 'press')
             real_vib = to_real_value(row.sensor_4, 'vib')
@@ -188,7 +212,7 @@ def get_real_data():
             return jsonify({
                 'id': row.id,
                 'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
-                'sensor_2': real_temp,   # Sending Real Values to Frontend
+                'sensor_2': real_temp,
                 'sensor_3': row.sensor_3, 
                 'sensor_4': real_vib,
                 'sensor_7': real_press,
@@ -213,7 +237,6 @@ class PredictResource(Resource):
         try:
             data = request.get_json()
 
-            # TRANSLATE: Convert Real Values (from Frontend) back to Normalized (for Model)
             norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
             norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
             norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
@@ -222,7 +245,7 @@ class PredictResource(Resource):
                 op_setting_1=float(data.get('op_setting_1', 0)), 
                 op_setting_2=float(data.get('op_setting_2', 0)), 
                 op_setting_3=float(data.get('op_setting_3', 0)),
-                sensor_2=norm_temp,     # Sending Normalized values to Model
+                sensor_2=norm_temp,
                 sensor_3=float(data.get('sensor_3', 0)), 
                 sensor_4=norm_vib,
                 sensor_7=norm_press,
@@ -247,11 +270,10 @@ class PredictResource(Resource):
             elif rul_value > 30: state = "WARNING"
             else: state = "CRITICAL"
 
-            # Save prediction using Real Values (for Report)
             new_pred = Prediction(
                 state=state, 
                 rul=rul_value, 
-                temperature=float(data.get('sensor_2', 0)), # Saving Real Values
+                temperature=float(data.get('sensor_2', 0)),
                 pressure=float(data.get('sensor_7', 0)), 
                 vibration=float(data.get('sensor_4', 0))
             )
@@ -281,7 +303,6 @@ def analyze_log():
 
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    # Graceful failure if model didn't load
     if not lstm_model or not lstm_scaler or not y_scaler:
         return jsonify({
             "prediction": 0, 
@@ -292,17 +313,12 @@ def predict_lstm():
     try:
         data = request.get_json()
         
-        # TRANSLATE: Real -> Normalized for LSTM
         norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
         norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
         norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
 
-        # Construct input list
         input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
         
-        # Override the translated ones
-        # Feature Order: op1, op2, op3, s2, s3, s4...
-        # s2 is index 3, s4 is index 5, s7 is index 6
         input_list[3] = norm_temp   # sensor_2
         input_list[6] = norm_press  # sensor_7
         input_list[5] = norm_vib    # sensor_4
@@ -321,7 +337,6 @@ def predict_lstm():
         sequence = np.array([list(history_buffer)])
         pred_scaled = lstm_model.predict(sequence, verbose=0)
         
-        # This calculates the rul variable
         rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
         
         return jsonify({
@@ -332,6 +347,7 @@ def predict_lstm():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 # --- REPORT GENERATION ENDPOINTS ---
 
 @app.route("/generate_report", methods=["POST"])
@@ -339,10 +355,7 @@ def api_generate_report():
     if not generate_maintenance_report: return jsonify({"error": "Report tools not installed"}), 500
     db = SessionLocal()
     try:
-        # 1. Get the latest Prediction (contains State and RUL)
         pred_row = db.query(Prediction).order_by(Prediction.id.desc()).first()
-        
-        # 2. Get Sensor Data (Use Prediction data as source of truth for consistency)
         if not pred_row:
              return jsonify({"error": "No prediction data available"}), 400
 
@@ -422,46 +435,9 @@ def api_delete_report(report_id):
     finally:
         db.close()
 
-
-import threading
-
-def load_rag_models_background():
-    """Loads heavy RAG models in background so first request is fast."""
-    print("🔄 Background Loader: Warming up RAG models...")
-    try:
-        from src.rag.retriever import ask_question
-        # Ask a dummy question to force model load
-        ask_question("test", None)
-        print("✅ Background Loader: RAG Models Ready!")
-    except Exception as e:
-        print(f"⚠️ Background Loader Failed: {e}")
-
-# Start loader in a separate thread
+# ---------------------------------------------------------
+# LOCAL DEBUG ENTRY POINT (RENDER IGNORES THIS)
+# ---------------------------------------------------------
 if __name__ == "__main__":
-    # Start background thread
-    loader_thread = threading.Thread(target=load_rag_models_background)
-    loader_thread.daemon = True
-    loader_thread.start()
-
-    print("🚀 Starting Flask Server...")
-    app.run(host="0.0.0.0", port=8000, debug=True)
-
-
-# Initialize Database Tables on Startup
-def init_db():
-    print("🚀 Initializing Database Tables...")
-    try:
-        from src.database.db import Base, engine
-        from src.database.models import EngineSensorData, Prediction, MaintenanceReport
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database Tables Ready.")
-    except Exception as e:
-        print(f"❌ DB Init Error: {e}")
-
-init_db()
-
-
-
-if __name__ == "__main__":
-    print("🚀 Starting Flask Server...")
+    print("🚀 Starting Flask Server (Local)...")
     app.run(host="0.0.0.0", port=8000, debug=True)
