@@ -7,9 +7,6 @@ import joblib
 import re
 import numpy as np
 from collections import deque
-# DISABLED TENSORFLOW TO SAVE MEMORY (LSTM model is corrupt anyway)
-# from tensorflow.keras.models import load_model 
-import threading
 
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,6 +17,22 @@ sys.path.insert(0, project_root)
 from src.database.db import SessionLocal, Base, engine
 from src.database.models import EngineSensorData, Prediction, MaintenanceReport
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
+
+# ---------------------------------------------------------
+# MASTER SWITCH (SELLER CONTROL)
+# ---------------------------------------------------------
+# Change these to True/False to enable/disable features.
+ENABLE_LSTM = True
+ENABLE_RAG = True
+
+# AUTO-DETECT CLOUD (RENDER)
+# Render automatically sets the 'RENDER' variable to 'true'.
+# On Cloud Free Tier, we FORCE RAG OFF to prevent memory crashes.
+if os.environ.get('RENDER') == 'true':
+    print("☁️ CLOUD DETECTED: Switching RAG OFF to save memory.")
+    ENABLE_RAG = False
+else:
+    print("💻 LOCAL DETECTED: All features ENABLED.")
 
 # ---------------------------------------------------------
 # 1. INITIALIZE DATABASE TABLES
@@ -83,10 +96,14 @@ def serve_static(path):
         return str(e), 500
 
 # ---------------------------------------------------------
-# RAG LAZY LOADER (SAVES RAM)
+# RAG ENDPOINT
 # ---------------------------------------------------------
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
+    # CHECK SWITCH
+    if not ENABLE_RAG:
+        return jsonify({"error": "RAG is disabled on this server."}), 503
+
     db = SessionLocal()
     try:
         data = request.get_json()
@@ -95,7 +112,7 @@ def rag_chat():
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        # LAZY LOAD RAG
+        # LAZY LOAD RAG (Only loads PyTorch if Switch is ON)
         try:
             print("🔄 Lazy Loading RAG Models...")
             from src.rag.retriever import ask_question
@@ -140,13 +157,16 @@ def clean_text_nlp(text):
     return text
 
 # ---------------------------------------------------------
-# LSTM DISABLED TO SAVE MEMORY
+# LSTM CONFIGURATION (LAZY LOADED)
 # ---------------------------------------------------------
-# The model file is corrupt. Importing TensorFlow crashes memory.
-lstm_model = None
-lstm_scaler = None
-y_scaler = None
-print("⚠️ LSTM DISABLED: Model file corrupt. Saving RAM.")
+LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
+SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
+Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
+
+# Global caches
+lstm_model_cache = None
+lstm_scaler_cache = None
+y_scaler_cache = None
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
@@ -241,12 +261,66 @@ def analyze_log():
     prediction = nlp_model.predict([clean_msg])[0]
     return jsonify({"log_message": log_message, "predicted_status": prediction})
 
+# ---------------------------------------------------------
+# LSTM ENDPOINT (WITH SWITCH & LAZY LOAD)
+# ---------------------------------------------------------
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    # Endpoint returns Unavailable because model is disabled
-    return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM is disabled to save memory."})
+    # CHECK SWITCH
+    if not ENABLE_LSTM:
+        return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM is disabled in config."})
 
-# --- REPORT ENDPOINTS (Keep your existing report code here) ---
+    global lstm_model_cache, lstm_scaler_cache, y_scaler_cache
+    
+    # LAZY LOAD TENSORFLOW (Only loads library when button is clicked)
+    if lstm_model_cache is None:
+        try:
+            print("🔄 Lazy Loading TensorFlow...")
+            from tensorflow.keras.models import load_model as tf_load_model
+            print("✅ TensorFlow Library Loaded.")
+            
+            if os.path.exists(LSTM_MODEL_PATH):
+                lstm_model_cache = tf_load_model(LSTM_MODEL_PATH)
+                lstm_scaler_cache = joblib.load(SCALER_PATH)
+                y_scaler_cache = joblib.load(Y_SCALER_PATH)
+                print("✅ LSTM Model Weights Loaded.")
+            else:
+                return jsonify({"error": "Model file missing on server"}), 500
+        except Exception as e:
+            print(f"❌ LSTM Load Error: {e}")
+            return jsonify({"error": f"Memory Error loading LSTM: {str(e)}"}), 500
+
+    try:
+        data = request.get_json()
+        
+        norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
+        norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
+        norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
+
+        input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
+        
+        input_list[3] = norm_temp   # sensor_2
+        input_list[6] = norm_press  # sensor_7
+        input_list[5] = norm_vib    # sensor_4
+        
+        input_data = np.array([input_list])
+        scaled_data = lstm_scaler_cache.transform(input_data)
+        history_buffer.append(scaled_data[0])
+        
+        if len(history_buffer) < SEQUENCE_LENGTH:
+            return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
+            
+        sequence = np.array([list(history_buffer)])
+        pred_scaled = lstm_model_cache.predict(sequence, verbose=0)
+        
+        rul = max(0, y_scaler_cache.inverse_transform(pred_scaled)[0][0])
+        
+        return jsonify({"prediction": float(rul), "status": "ACTIVE", "message": "Deep Learning Analysis Complete"})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- REPORT ENDPOINTS ---
 @app.route("/generate_report", methods=["POST"])
 def api_generate_report():
     if not generate_maintenance_report: return jsonify({"error": "Report tools not installed"}), 500
