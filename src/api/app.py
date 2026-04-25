@@ -80,9 +80,9 @@ def load_rag_models_background():
         print(f"⚠️ Background Loader Failed: {e}")
 
 # Start the thread immediately when script loads
-rag_thread = threading.Thread(target=load_rag_models_background)
-rag_thread.daemon = True
-rag_thread.start()
+#rag_thread = threading.Thread(target=load_rag_models_background)
+#rag_thread.daemon = True
+#rag_thread.start()
 
 # Routes for Webpage
 @app.route("/", methods=['GET'])
