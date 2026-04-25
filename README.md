@@ -183,14 +183,9 @@ python -m src.api.app
 
 ---
 
-## 🔮 Future Scope
 
-- 📚 RAG-based assistant  
-- 🐳 Docker  
-- ☁️ Cloud deployment  
-- ⚡ Real-time streaming  
 
----
+
 
 ## 📜 License
 
