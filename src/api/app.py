@@ -7,6 +7,8 @@ import joblib
 import re
 import numpy as np
 from collections import deque
+from tensorflow.keras.models import load_model
+import threading
 
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,22 +19,6 @@ sys.path.insert(0, project_root)
 from src.database.db import SessionLocal, Base, engine
 from src.database.models import EngineSensorData, Prediction, MaintenanceReport
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
-
-# ---------------------------------------------------------
-# MASTER SWITCH (SELLER CONTROL)
-# ---------------------------------------------------------
-# Change these to True/False to enable/disable features.
-ENABLE_LSTM = True
-ENABLE_RAG = True
-
-# AUTO-DETECT CLOUD (RENDER)
-# Render automatically sets the 'RENDER' variable to 'true'.
-# On Cloud Free Tier, we FORCE RAG OFF to prevent memory crashes.
-if os.environ.get('RENDER') == 'true':
-    print("☁️ CLOUD DETECTED: Switching RAG OFF to save memory.")
-    ENABLE_RAG = False
-else:
-    print("💻 LOCAL DETECTED: All features ENABLED.")
 
 # ---------------------------------------------------------
 # 1. INITIALIZE DATABASE TABLES
@@ -96,14 +82,29 @@ def serve_static(path):
         return str(e), 500
 
 # ---------------------------------------------------------
+# RAG BACKGROUND LOADER
+# ---------------------------------------------------------
+def load_rag_models_background():
+    """Loads heavy RAG models in background so first request is fast."""
+    print("🔄 Background Loader: Warming up RAG models...")
+    try:
+        from src.rag.retriever import ask_question
+        # Ask a dummy question to force model load
+        ask_question("test", None)
+        print("✅ Background Loader: RAG Models Ready!")
+    except Exception as e:
+        print(f"⚠️ Background Loader Failed: {e}")
+
+# Start loader in a separate thread
+rag_thread = threading.Thread(target=load_rag_models_background)
+rag_thread.daemon = True
+rag_thread.start()
+
+# ---------------------------------------------------------
 # RAG ENDPOINT
 # ---------------------------------------------------------
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
-    # CHECK SWITCH
-    if not ENABLE_RAG:
-        return jsonify({"error": "RAG is disabled on this server."}), 503
-
     db = SessionLocal()
     try:
         data = request.get_json()
@@ -112,29 +113,33 @@ def rag_chat():
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        # LAZY LOAD RAG (Only loads PyTorch if Switch is ON)
         try:
-            print("🔄 Lazy Loading RAG Models...")
             from src.rag.retriever import ask_question
-            print("✅ RAG Models Loaded.")
         except Exception as import_error:
             print(f"❌ RAG Import Error: {import_error}")
-            return jsonify({"error": "AI Brain failed to start."}), 500
+            return jsonify({"error": "AI Brain is loading or failed to start."}), 500
 
         last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
         
         live_context = None
         if last_pred:
             live_context = {
-                "state": last_pred.state, "rul": last_pred.rul,
-                "temperature": last_pred.temperature, "pressure": last_pred.pressure,
+                "state": last_pred.state,
+                "rul": last_pred.rul,
+                "temperature": last_pred.temperature,
+                "pressure": last_pred.pressure,
                 "vibration": last_pred.vibration
             }
         
         answer, sources = ask_question(query, live_context)
-        return jsonify({"answer": answer, "sources": sources})
+        
+        return jsonify({
+            "answer": answer,
+            "sources": sources
+        })
         
     except Exception as e:
+        print(f"❌ RAG Runtime Error: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
@@ -156,17 +161,23 @@ def clean_text_nlp(text):
     text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
     return text
 
-# ---------------------------------------------------------
-# LSTM CONFIGURATION (LAZY LOADED)
-# ---------------------------------------------------------
+# LSTM Loading
 LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
 SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
 Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 
-# Global caches
-lstm_model_cache = None
-lstm_scaler_cache = None
-y_scaler_cache = None
+try:
+    if os.path.exists(LSTM_MODEL_PATH):
+        lstm_model = load_model(LSTM_MODEL_PATH)
+        print("✅ LSTM Model Loaded.")
+    else:
+        lstm_model = None
+except Exception as e:
+    print(f"⚠️ LSTM Model loading failed: {e}")
+    lstm_model = None
+    
+lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
+y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
@@ -196,10 +207,12 @@ def get_real_data():
             real_vib = to_real_value(row.sensor_4, 'vib')
 
             return jsonify({
-                'id': row.id, 'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
+                'id': row.id,
+                'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
                 'sensor_2': real_temp, 'sensor_3': row.sensor_3, 'sensor_4': real_vib, 'sensor_7': real_press,
-                'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9, 'sensor_11': row.sensor_11, 'sensor_12': row.sensor_12, 
-                'sensor_13': row.sensor_13, 'sensor_14': row.sensor_14, 'sensor_15': row.sensor_15, 'sensor_17': row.sensor_17,
+                'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9,
+                'sensor_11': row.sensor_11, 'sensor_12': row.sensor_12, 'sensor_13': row.sensor_13,
+                'sensor_14': row.sensor_14, 'sensor_15': row.sensor_15, 'sensor_17': row.sensor_17,
                 'sensor_20': row.sensor_20, 'sensor_21': row.sensor_21
             })
         else:
@@ -222,7 +235,8 @@ class PredictResource(Resource):
             custom_data = CustomData(
                 op_setting_1=float(data.get('op_setting_1', 0)), op_setting_2=float(data.get('op_setting_2', 0)), 
                 op_setting_3=float(data.get('op_setting_3', 0)), sensor_2=norm_temp, sensor_3=float(data.get('sensor_3', 0)), 
-                sensor_4=norm_vib, sensor_7=norm_press, sensor_8=float(data.get('sensor_8', 0)), sensor_9=float(data.get('sensor_9', 0)),
+                sensor_4=norm_vib, sensor_7=norm_press,
+                sensor_8=float(data.get('sensor_8', 0)), sensor_9=float(data.get('sensor_9', 0)),
                 sensor_11=float(data.get('sensor_11', 0)), sensor_12=float(data.get('sensor_12', 0)), sensor_13=float(data.get('sensor_13', 0)),
                 sensor_14=float(data.get('sensor_14', 0)), sensor_15=float(data.get('sensor_15', 0)), sensor_17=float(data.get('sensor_17', 0)),
                 sensor_20=float(data.get('sensor_20', 0)), sensor_21=float(data.get('sensor_21', 0))
@@ -261,35 +275,11 @@ def analyze_log():
     prediction = nlp_model.predict([clean_msg])[0]
     return jsonify({"log_message": log_message, "predicted_status": prediction})
 
-# ---------------------------------------------------------
-# LSTM ENDPOINT (WITH SWITCH & LAZY LOAD)
-# ---------------------------------------------------------
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    # CHECK SWITCH
-    if not ENABLE_LSTM:
-        return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM is disabled in config."})
-
-    global lstm_model_cache, lstm_scaler_cache, y_scaler_cache
+    if not lstm_model or not lstm_scaler or not y_scaler:
+        return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM Model not available."})
     
-    # LAZY LOAD TENSORFLOW (Only loads library when button is clicked)
-    if lstm_model_cache is None:
-        try:
-            print("🔄 Lazy Loading TensorFlow...")
-            from tensorflow.keras.models import load_model as tf_load_model
-            print("✅ TensorFlow Library Loaded.")
-            
-            if os.path.exists(LSTM_MODEL_PATH):
-                lstm_model_cache = tf_load_model(LSTM_MODEL_PATH)
-                lstm_scaler_cache = joblib.load(SCALER_PATH)
-                y_scaler_cache = joblib.load(Y_SCALER_PATH)
-                print("✅ LSTM Model Weights Loaded.")
-            else:
-                return jsonify({"error": "Model file missing on server"}), 500
-        except Exception as e:
-            print(f"❌ LSTM Load Error: {e}")
-            return jsonify({"error": f"Memory Error loading LSTM: {str(e)}"}), 500
-
     try:
         data = request.get_json()
         
@@ -304,16 +294,16 @@ def predict_lstm():
         input_list[5] = norm_vib    # sensor_4
         
         input_data = np.array([input_list])
-        scaled_data = lstm_scaler_cache.transform(input_data)
+        scaled_data = lstm_scaler.transform(input_data)
         history_buffer.append(scaled_data[0])
         
         if len(history_buffer) < SEQUENCE_LENGTH:
             return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
             
         sequence = np.array([list(history_buffer)])
-        pred_scaled = lstm_model_cache.predict(sequence, verbose=0)
+        pred_scaled = lstm_model.predict(sequence, verbose=0)
         
-        rul = max(0, y_scaler_cache.inverse_transform(pred_scaled)[0][0])
+        rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
         
         return jsonify({"prediction": float(rul), "status": "ACTIVE", "message": "Deep Learning Analysis Complete"})
         
@@ -377,5 +367,5 @@ def api_delete_report(report_id):
     finally: db.close()
 
 if __name__ == "__main__":
-    print("🚀 Starting Flask Server (Local)...")
+    print("🚀 Starting Flask Server...")
     app.run(host="0.0.0.0", port=8000, debug=True)
