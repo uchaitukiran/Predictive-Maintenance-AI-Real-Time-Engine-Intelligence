@@ -65,26 +65,6 @@ def to_norm_value(real_val, sensor_type):
 app = Flask(__name__, static_folder=WEBAPP_DIR) 
 CORS(app)
 
-# ---------------------------------------------------------
-# 2. START RAG LOADER (MUST RUN ON IMPORT, NOT IN MAIN)
-# ---------------------------------------------------------
-def load_rag_models_background():
-    """Loads heavy RAG models in background so first request is fast."""
-    print("🔄 Background Loader: Warming up RAG models...")
-    try:
-        from src.rag.retriever import ask_question
-        # Ask a dummy question to force model load
-        ask_question("test", None)
-        print("✅ Background Loader: RAG Models Ready!")
-    except Exception as e:
-        print(f"⚠️ Background Loader Failed: {e}")
-
-# Start the thread immediately when script loads
-# DISABLED: This causes memory crashes on Render Free Tier.
-# rag_thread = threading.Thread(target=load_rag_models_background)
-# rag_thread.daemon = True
-# rag_thread.start()
-
 # Routes for Webpage
 @app.route("/", methods=['GET'])
 def index():
@@ -104,7 +84,13 @@ def serve_static(path):
             return "File not found", 404
     except Exception as e:
         return str(e), 500
-    
+
+# ---------------------------------------------------------
+# RAG LAZY LOADER (CRITICAL FOR MEMORY)
+# ---------------------------------------------------------
+# We do NOT load RAG on startup. We load it only when asked.
+# This prevents the 512MB Memory Crash.
+
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
     db = SessionLocal()
@@ -115,13 +101,17 @@ def rag_chat():
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        # Import happens instantly now because models are loaded in background
+        # 1. LAZY LOAD RAG
+        # This imports and loads models ONLY when you click "Ask"
         try:
+            print("🔄 Lazy Loading RAG Models...")
             from src.rag.retriever import ask_question
+            print("✅ RAG Models Loaded.")
         except Exception as import_error:
             print(f"❌ RAG Import Error: {import_error}")
             return jsonify({"error": "AI Brain is loading or failed to start. Check server logs."}), 500
 
+        # 2. Get Live Data
         last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
         
         live_context = None
@@ -134,6 +124,7 @@ def rag_chat():
                 "vibration": last_pred.vibration
             }
         
+        # 3. Call RAG
         answer, sources = ask_question(query, live_context)
         
         return jsonify({
@@ -172,15 +163,16 @@ Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 try:
     if os.path.exists(LSTM_MODEL_PATH):
         lstm_model = load_model(LSTM_MODEL_PATH)
+        print("✅ LSTM Model Loaded.")
     else:
         lstm_model = None
+        print("⚠️ LSTM Model file not found.")
 except Exception as e:
     print(f"⚠️ LSTM Model loading failed: {e}")
     lstm_model = None
     
 lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
 y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
-if lstm_model: print("✅ LSTM Model Loaded.")
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
