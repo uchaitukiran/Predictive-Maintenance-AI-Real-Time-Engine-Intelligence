@@ -7,9 +7,8 @@ import joblib
 import re
 import numpy as np
 from collections import deque
-# DISABLED TENSORFLOW TO SAVE MEMORY (LSTM model is corrupt anyway)
-# from tensorflow.keras.models import load_model 
-import threading
+# CRITICAL: We REMOVED 'import tensorflow' and 'import threading' from here.
+# This saves massive amounts of RAM at startup.
 
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -83,7 +82,7 @@ def serve_static(path):
         return str(e), 500
 
 # ---------------------------------------------------------
-# RAG LAZY LOADER (SAVES RAM)
+# RAG ENDPOINT (LAZY LOADED)
 # ---------------------------------------------------------
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
@@ -91,11 +90,10 @@ def rag_chat():
     try:
         data = request.get_json()
         query = data.get("query", "")
-        
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        # LAZY LOAD RAG
+        # 1. LAZY LOAD RAG (Only imports PyTorch when you click 'Ask')
         try:
             print("🔄 Lazy Loading RAG Models...")
             from src.rag.retriever import ask_question
@@ -104,8 +102,8 @@ def rag_chat():
             print(f"❌ RAG Import Error: {import_error}")
             return jsonify({"error": "AI Brain failed to start."}), 500
 
+        # 2. Get Live Data
         last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
-        
         live_context = None
         if last_pred:
             live_context = {
@@ -129,7 +127,7 @@ ns = api.namespace('', description='Operations')
 # Global Variables
 current_simulation_id = 0
 
-# NLP Model Loading
+# NLP Model Loading (Lightweight)
 NLP_MODEL_PATH = os.path.join(project_root, "artifacts", "nlp_log_classifier.pkl")
 nlp_model = joblib.load(NLP_MODEL_PATH) if os.path.exists(NLP_MODEL_PATH) else None
 if nlp_model: print("✅ NLP Model Loaded.")
@@ -140,13 +138,13 @@ def clean_text_nlp(text):
     return text
 
 # ---------------------------------------------------------
-# LSTM DISABLED TO SAVE MEMORY
+# LSTM CONFIGURATION (NO TENSORFLOW IMPORT HERE)
 # ---------------------------------------------------------
-# The model file is corrupt. Importing TensorFlow crashes memory.
-lstm_model = None
-lstm_scaler = None
-y_scaler = None
-print("⚠️ LSTM DISABLED: Model file corrupt. Saving RAM.")
+# We do NOT load TensorFlow here. We load it inside the function.
+# This saves 300MB+ RAM at startup.
+LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
+SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
+Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
@@ -241,12 +239,63 @@ def analyze_log():
     prediction = nlp_model.predict([clean_msg])[0]
     return jsonify({"log_message": log_message, "predicted_status": prediction})
 
+# ---------------------------------------------------------
+# LSTM ENDPOINT (LAZY LOADED)
+# ---------------------------------------------------------
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    # Endpoint returns Unavailable because model is disabled
-    return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM is disabled to save memory."})
+    # 1. LAZY LOAD TENSORFLOW (Only loads library when button is clicked)
+    try:
+        print("🔄 Lazy Loading TensorFlow...")
+        from tensorflow.keras.models import load_model as tf_load_model
+        print("✅ TensorFlow Loaded.")
+    except Exception as e:
+        return jsonify({"error": f"TensorFlow load failed: {e}"}), 500
 
-# --- REPORT ENDPOINTS (Keep your existing report code here) ---
+    # 2. Load Scalers (Safe to load every time for now, they are small)
+    lstm_scaler = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
+    y_scaler = joblib.load(Y_SCALER_PATH) if os.path.exists(Y_SCALER_PATH) else None
+    
+    if not lstm_scaler or not y_scaler:
+         return jsonify({"prediction": 0, "status": "ERROR", "message": "Scalers missing"})
+
+    try:
+        # Load Model
+        lstm_model = tf_load_model(LSTM_MODEL_PATH) if os.path.exists(LSTM_MODEL_PATH) else None
+        
+        if not lstm_model:
+             return jsonify({"prediction": 0, "status": "ERROR", "message": "Model file not found"})
+
+        data = request.get_json()
+        
+        norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
+        norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
+        norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
+
+        input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
+        
+        input_list[3] = norm_temp   # sensor_2
+        input_list[6] = norm_press  # sensor_7
+        input_list[5] = norm_vib    # sensor_4
+        
+        input_data = np.array([input_list])
+        scaled_data = lstm_scaler.transform(input_data)
+        history_buffer.append(scaled_data[0])
+        
+        if len(history_buffer) < SEQUENCE_LENGTH:
+            return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
+            
+        sequence = np.array([list(history_buffer)])
+        pred_scaled = lstm_model.predict(sequence, verbose=0)
+        
+        rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
+        
+        return jsonify({"prediction": float(rul), "status": "ACTIVE", "message": "Deep Learning Analysis Complete"})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- REPORT ENDPOINTS (Same as before) ---
 @app.route("/generate_report", methods=["POST"])
 def api_generate_report():
     if not generate_maintenance_report: return jsonify({"error": "Report tools not installed"}), 500
