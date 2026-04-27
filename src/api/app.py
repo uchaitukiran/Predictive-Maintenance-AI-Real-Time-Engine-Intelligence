@@ -7,8 +7,7 @@ import joblib
 import re
 import numpy as np
 from collections import deque
-# CRITICAL: We REMOVED top-level TensorFlow import to save memory on startup.
-# We also removed RAG imports.
+import threading
 
 # Setup Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +20,21 @@ from src.database.models import EngineSensorData, Prediction, MaintenanceReport
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
 
 # ---------------------------------------------------------
-# MASTER SWITCHES
+# MASTER SWITCH: DETECT CLOUD vs LOCAL
 # ---------------------------------------------------------
-ENABLE_RAG = False  # DISABLED ON CLOUD TO SAVE MEMORY
-ENABLE_LSTM = True  # ENABLED, BUT WILL LOAD LAZILY (ON CLICK)
+# Render automatically sets the 'RENDER' variable to 'true'.
+IS_CLOUD = os.environ.get('RENDER') == 'true'
+
+if IS_CLOUD:
+    # ON CLOUD: Disable Heavy Models to save memory
+    ENABLE_DL = False
+    ENABLE_RAG = False
+    print("☁️ CLOUD DETECTED: DL & RAG Switched OFF (Low Memory).")
+else:
+    # ON LOCAL: Enable everything for full features
+    ENABLE_DL = True
+    ENABLE_RAG = True
+    print("💻 LOCAL DETECTED: All Features ENABLED.")
 
 # ---------------------------------------------------------
 # 1. INITIALIZE DATABASE TABLES
@@ -88,12 +98,57 @@ def serve_static(path):
         return str(e), 500
 
 # ---------------------------------------------------------
-# RAG ENDPOINT (DISABLED)
+# RAG SETUP
 # ---------------------------------------------------------
+def load_rag_models_background():
+    """Loads heavy RAG models in background."""
+    print("🔄 Background Loader: Warming up RAG models...")
+    try:
+        from src.rag.retriever import ask_question
+        ask_question("test", None)
+        print("✅ Background Loader: RAG Models Ready!")
+    except Exception as e:
+        print(f"⚠️ Background Loader Failed: {e}")
+
+# Only start RAG thread if enabled (Local only)
+if ENABLE_RAG:
+    rag_thread = threading.Thread(target=load_rag_models_background)
+    rag_thread.daemon = True
+    rag_thread.start()
+
 @app.route("/rag_chat", methods=["POST"])
 def rag_chat():
-    # Returns immediate error because ENABLE_RAG is False
-    return jsonify({"error": "RAG is disabled on Cloud Free Tier to save memory."}), 503
+    if not ENABLE_RAG:
+        return jsonify({"error": "RAG switchoffed due to low memory"}), 503
+
+    db = SessionLocal()
+    try:
+        data = request.get_json()
+        query = data.get("query", "")
+        if not query:
+            return jsonify({"error": "No query provided"}), 400
+        
+        try:
+            from src.rag.retriever import ask_question
+        except Exception as import_error:
+            return jsonify({"error": "AI Brain is loading or failed to start."}), 500
+
+        last_pred = db.query(Prediction).order_by(Prediction.id.desc()).first()
+        live_context = None
+        if last_pred:
+            live_context = {
+                "state": last_pred.state, "rul": last_pred.rul,
+                "temperature": last_pred.temperature, "pressure": last_pred.pressure,
+                "vibration": last_pred.vibration
+            }
+        
+        answer, sources = ask_question(query, live_context)
+        return jsonify({"answer": answer, "sources": sources})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
 
 # API Setup
 api = Api(app, version='1.0', title='Engine Health Monitoring API', doc='/docs')
@@ -102,7 +157,7 @@ ns = api.namespace('', description='Operations')
 # Global Variables
 current_simulation_id = 0
 
-# NLP Model Loading (Lightweight, safe to load)
+# NLP Model Loading (Lightweight, always on)
 NLP_MODEL_PATH = os.path.join(project_root, "artifacts", "nlp_log_classifier.pkl")
 nlp_model = joblib.load(NLP_MODEL_PATH) if os.path.exists(NLP_MODEL_PATH) else None
 if nlp_model: print("✅ NLP Model Loaded.")
@@ -113,16 +168,31 @@ def clean_text_nlp(text):
     return text
 
 # ---------------------------------------------------------
-# LSTM CONFIGURATION (LAZY LOADED)
+# LSTM / DL SETUP
 # ---------------------------------------------------------
 LSTM_MODEL_PATH = os.path.join(project_root, "artifacts", "lstm_model.keras")
 SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_scaler.pkl")
 Y_SCALER_PATH = os.path.join(project_root, "artifacts", "lstm_y_scaler.pkl")
 
-# Global caches for LSTM
-lstm_model_cache = None
-lstm_scaler_cache = None
-y_scaler_cache = None
+# Only load TensorFlow if enabled (Local only)
+lstm_model = None
+lstm_scaler = None
+y_scaler = None
+
+if ENABLE_DL:
+    try:
+        from tensorflow.keras.models import load_model
+        if os.path.exists(LSTM_MODEL_PATH):
+            lstm_model = load_model(LSTM_MODEL_PATH)
+            lstm_scaler = joblib.load(SCALER_PATH)
+            y_scaler = joblib.load(Y_SCALER_PATH)
+            print("✅ LSTM Model Loaded.")
+        else:
+            print("⚠️ LSTM Model file missing.")
+    except Exception as e:
+        print(f"⚠️ LSTM Model loading failed: {e}")
+else:
+    print("⚠️ LSTM DISABLED: Switched off due to low memory.")
 
 SEQUENCE_LENGTH = 30
 history_buffer = deque(maxlen=SEQUENCE_LENGTH)
@@ -152,12 +222,10 @@ def get_real_data():
             real_vib = to_real_value(row.sensor_4, 'vib')
 
             return jsonify({
-                'id': row.id,
-                'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
+                'id': row.id, 'op_setting_1': row.op_setting_1, 'op_setting_2': row.op_setting_2, 'op_setting_3': row.op_setting_3,
                 'sensor_2': real_temp, 'sensor_3': row.sensor_3, 'sensor_4': real_vib, 'sensor_7': real_press,
-                'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9,
-                'sensor_11': row.sensor_11, 'sensor_12': row.sensor_12, 'sensor_13': row.sensor_13,
-                'sensor_14': row.sensor_14, 'sensor_15': row.sensor_15, 'sensor_17': row.sensor_17,
+                'sensor_8': row.sensor_8, 'sensor_9': row.sensor_9, 'sensor_11': row.sensor_11, 'sensor_12': row.sensor_12, 
+                'sensor_13': row.sensor_13, 'sensor_14': row.sensor_14, 'sensor_15': row.sensor_15, 'sensor_17': row.sensor_17,
                 'sensor_20': row.sensor_20, 'sensor_21': row.sensor_21
             })
         else:
@@ -220,63 +288,37 @@ def analyze_log():
     prediction = nlp_model.predict([clean_msg])[0]
     return jsonify({"log_message": log_message, "predicted_status": prediction})
 
-# ---------------------------------------------------------
-# LSTM ENDPOINT (LAZY LOADED FOR CLOUD)
-# ---------------------------------------------------------
 @app.route("/predict_lstm", methods=["POST"])
 def predict_lstm():
-    global lstm_model_cache, lstm_scaler_cache, y_scaler_cache
+    # Check if DL is switched off
+    if not ENABLE_DL or lstm_model is None:
+        return jsonify({
+            "prediction": 0, 
+            "status": "DISABLED", 
+            "message": "DL switchoffed due to low memory"
+        })
     
-    # 1. CHECK SWITCH
-    if not ENABLE_LSTM:
-        return jsonify({"prediction": 0, "status": "DISABLED", "message": "LSTM is disabled."})
-
-    # 2. LAZY LOAD TENSORFLOW & MODEL (Only runs once)
-    if lstm_model_cache is None:
-        try:
-            print("🔄 Lazy Loading TensorFlow (this takes time on Free Tier)...")
-            # Import heavy library ONLY when needed
-            from tensorflow.keras.models import load_model
-            
-            if os.path.exists(LSTM_MODEL_PATH):
-                lstm_model_cache = load_model(LSTM_MODEL_PATH)
-                lstm_scaler_cache = joblib.load(SCALER_PATH)
-                y_scaler_cache = joblib.load(Y_SCALER_PATH)
-                print("✅ LSTM Model Loaded into Memory.")
-            else:
-                return jsonify({"error": "Model file missing on server"}), 500
-        except Exception as e:
-            print(f"❌ LSTM Load Error: {e}")
-            return jsonify({"error": f"Server Out of Memory or Model Corrupt: {str(e)}"}), 500
-
-    # 3. PREDICTION LOGIC
     try:
         data = request.get_json()
-        
         norm_temp = to_norm_value(float(data.get('sensor_2', 0)), 'temp')
         norm_press = to_norm_value(float(data.get('sensor_7', 0)), 'press')
         norm_vib = to_norm_value(float(data.get('sensor_4', 0)), 'vib')
 
         input_list = [float(data.get(col, 0)) for col in FEATURE_ORDER]
-        
-        input_list[3] = norm_temp   # sensor_2
-        input_list[6] = norm_press  # sensor_7
-        input_list[5] = norm_vib    # sensor_4
+        input_list[3] = norm_temp; input_list[6] = norm_press; input_list[5] = norm_vib
         
         input_data = np.array([input_list])
-        scaled_data = lstm_scaler_cache.transform(input_data)
+        scaled_data = lstm_scaler.transform(input_data)
         history_buffer.append(scaled_data[0])
         
         if len(history_buffer) < SEQUENCE_LENGTH:
             return jsonify({"prediction": 0, "status": "ACCUMULATING", "message": f"Cycle {len(history_buffer)}/{SEQUENCE_LENGTH}"})
             
         sequence = np.array([list(history_buffer)])
-        pred_scaled = lstm_model_cache.predict(sequence, verbose=0)
-        
-        rul = max(0, y_scaler_cache.inverse_transform(pred_scaled)[0][0])
+        pred_scaled = lstm_model.predict(sequence, verbose=0)
+        rul = max(0, y_scaler.inverse_transform(pred_scaled)[0][0])
         
         return jsonify({"prediction": float(rul), "status": "ACTIVE", "message": "Deep Learning Analysis Complete"})
-        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
